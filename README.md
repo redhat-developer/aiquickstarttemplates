@@ -8,7 +8,175 @@ Red Hat AI Quickstarts are ready-to-run, industry-specific use cases designed to
 
 ## Available Templates
 
-### 1. Generic AI Quickstart Template
+**All templates have 1:1 mapping with real [rh-ai-quickstart](https://github.com/rh-ai-quickstart) repositories**
+
+### 1. Enterprise RAG Chatbot ✅
+**Template ID:** `redhat-ai-enterprise-rag-chatbot`
+**Repository:** [rh-ai-quickstart/RAG](https://github.com/rh-ai-quickstart/RAG)
+
+Deploy a Retrieval-Augmented Generation chatbot with company-specific data integration.
+
+**Features:**
+- Local (Podman/Ollama) and OpenShift (Helm/vLLM) deployment modes
+- PGVector (PostgreSQL) for vector storage
+- LlamaStack framework with Ollama
+- Streamlit UI for chat interface
+- Docling for advanced PDF processing
+- Multiple data sources (GitHub, S3/MinIO, URLs)
+- Llama 3.2-3B-Instruct or larger models
+- all-MiniLM-L6-v2 embeddings
+- Kubeflow Pipelines for ingestion (optional)
+
+**Technologies:**
+- Vector DB: PGVector (PostgreSQL)
+- LLM: Llama 3.2 3B / 3.1 8B/70B
+- Embedding: all-MiniLM-L6-v2
+- Framework: LlamaStack
+- UI: Streamlit
+- Deployment: Podman Compose (local) or Helm (OpenShift)
+
+**Hardware:** CPU/GPU (OpenShift), Intel Gaudi, NVIDIA GPU support
+
+---
+
+### 2. IT Self-Service Agent ✅
+**Template ID:** `redhat-ai-it-self-service-agent`
+**Repository:** [rh-ai-quickstart/it-self-service-agent](https://github.com/rh-ai-quickstart/it-self-service-agent)
+
+Deploy an AI-powered self-service agent for IT process automation using agentic AI patterns.
+
+**Features:**
+- Llama 3 70B integration with LangGraph
+- Testing mode (mock eventing) and production mode (Kafka + Knative)
+- Safety guardrails (Llama Guard 3, PromptGuard)
+- Multi-channel support (Slack, ServiceNow, CLI, Email)
+- OpenTelemetry distributed tracing
+- DeepEval framework for testing
+- PostgreSQL for conversation state
+- Request manager and specialist agent pattern
+
+**Technologies:**
+- LangGraph (multi-step prompting)
+- Llama 3 70B
+- Kafka & Knative Eventing
+- OpenTelemetry
+- Model Context Protocol (MCP)
+- PostgreSQL
+
+**Documentation:** [AI quickstart: Self-service agent for IT process automation](https://developers.redhat.com/articles/2026/01/26/ai-quickstart-self-service-agent-it-process-automation)
+
+**Deployment Time:** 60-90 minutes (testing), 2-3 hours (production)
+
+---
+
+### 3. LLM CPU Serving - HR Assistant ✅
+**Template ID:** `redhat-ai-llm-cpu-serving`
+**Repository:** [rh-ai-quickstart/llm-cpu-serving](https://github.com/rh-ai-quickstart/llm-cpu-serving)
+
+AI-powered HR Assistant using vLLM on CPU (no GPU required).
+
+**Features:**
+- TinyLlama 1.1B model optimized for CPU
+- AnythingLLM workbench chat interface
+- vLLM CPU runtime with OpenAI-compatible API
+- Helm chart deployment on OpenShift AI
+- Pre-configured "Assistant to the HR Representative" workspace
+- Document-aware conversations with policy citations
+
+**Technologies:**
+- Model: TinyLlama 1.1B
+- Runtime: vLLM CPU
+- UI: AnythingLLM workbench
+- Deployment: Helm
+- Container: quay.io/rh-aiservices-bu/vllm-cpu-openai-ubi9
+
+**Resource Requirements:**
+- Minimum: 2 cores, 4GB RAM, 5GB storage
+- Recommended: 8 cores, 8GB RAM (Intel AVX-512 preferred)
+
+**Prerequisites:**
+- OpenShift 4.16.24+
+- OpenShift AI 2.16.2+
+- Service Mesh & Serverless
+
+**Use Case:** Financial services HR representatives seeking policy guidance
+
+---
+
+### 4. AI Virtual Agent Platform ✅
+**Template ID:** `redhat-ai-virtual-agent`
+**Repository:** [rh-ai-quickstart/ai-virtual-agent](https://github.com/rh-ai-quickstart/ai-virtual-agent)
+
+Conversational AI agent platform with RAG, knowledge bases, and MCP server integration.
+
+**Features:**
+- React + PatternFly frontend UI
+- FastAPI backend server
+- LlamaStack AI platform (Ollama llama3.2:3b)
+- PostgreSQL + pgvector for knowledge bases
+- MinIO for file attachments
+- Model Context Protocol (MCP) server
+- Web search tool integration
+- Safety guardrails and content filtering
+- Agent management and configuration
+- Streaming conversations with history
+- Local (Docker Compose) and OpenShift deployment
+
+**Technologies:**
+- Frontend: React with PatternFly
+- Backend: FastAPI
+- AI: LlamaStack with Ollama
+- Database: PostgreSQL + pgvector
+- Storage: MinIO
+- MCP: Model Context Protocol servers
+
+**Prerequisites (OpenShift):**
+- Cluster admin access for OAuth
+- Red Hat OpenShift AI
+- Hugging Face token (optional)
+
+**Use Cases:** Customer service automation, IT support agents, knowledge base Q&A
+
+---
+
+### 5. AI Observability Summarizer ✅
+**Template ID:** `redhat-ai-observability-summarizer`
+**Repository:** [rh-ai-quickstart/ai-observability-summarizer](https://github.com/rh-ai-quickstart/ai-observability-summarizer)
+
+Transform complex OpenShift AI metrics into actionable business insights.
+
+**Features:**
+- Natural language queries ("How is my GPU performing?")
+- Multi-dashboard Streamlit interface (vLLM, OpenShift, Chat, GPU)
+- AI-powered Slack alerts and notifications
+- HTML/PDF/Markdown report generation
+- Distributed tracing with Tempo
+- Centralized logging with Loki
+- OpenTelemetry Collector integration
+- GPU & vLLM performance monitoring
+- MCP server for Claude Desktop/Cursor
+- Prometheus/Thanos metrics collection
+
+**Technologies:**
+- LLM: Llama 3.2 (1B/3B) or 3.1 (8B/70B)
+- UI: Streamlit multi-dashboard
+- Backend: Llama Stack
+- Metrics: Prometheus/Thanos
+- Tracing: Tempo + OpenTelemetry
+- Logging: Loki
+- Storage: MinIO
+
+**Prerequisites:**
+- OpenShift 4.16.24+
+- OpenShift AI 2.16.2+
+- Service Mesh & Serverless
+- Prometheus/Thanos monitoring
+
+**Use Cases:** AI operations monitoring, resource optimization, business ROI tracking
+
+---
+
+### 6. Generic AI Quickstart Template
 **Template ID:** `redhat-ai-quickstart-generic`
 
 A flexible template that can be adapted for any Red Hat AI quickstart with customizable parameters.
@@ -24,116 +192,6 @@ A flexible template that can be adapted for any Red Hat AI quickstart with custo
 - Experimenting with different AI quickstarts
 - Quick prototyping
 - Custom AI application deployments
-
----
-
-### 2. IT Self-Service Agent
-**Template ID:** `redhat-ai-it-self-service-agent`
-
-Deploy an AI-powered self-service agent for IT process automation using agentic AI patterns.
-
-**Features:**
-- Llama 3 70B integration with LangGraph
-- Testing mode (mock eventing) and production mode (Kafka + Knative)
-- Safety guardrails (Llama Guard 3, PromptGuard)
-- Multi-channel support (Slack, ServiceNow, CLI, Email)
-- OpenTelemetry distributed tracing
-- DeepEval framework for testing
-
-**Technologies:**
-- LangGraph (multi-step prompting)
-- Llama 3 70B
-- Kafka & Knative Eventing
-- OpenTelemetry
-- Model Context Protocol (MCP)
-
-**Documentation:** [AI quickstart: Self-service agent for IT process automation](https://developers.redhat.com/articles/2026/01/26/ai-quickstart-self-service-agent-it-process-automation)
-
-**Deployment Time:** 60-90 minutes (testing), 2-3 hours (production)
-
----
-
-### 3. Product Recommender System
-**Template ID:** `redhat-ai-product-recommender`
-
-Build an AI-driven product recommendation system with semantic search and automated review summarization.
-
-**Features:**
-- Multiple ML model integration (embeddings, LLM, recommender)
-- Feast feature store for data consistency
-- KFP/Argo Workflows for ML pipelines
-- KServe for model serving
-- S3-compatible storage integration
-- Jupyter notebooks for model development
-
-**Technologies:**
-- BAAI/BGE embeddings for text
-- OpenAI/CLIP for images
-- Llama 3.1 8B for summaries
-- Two-tower recommender model
-- Feast feature store
-- OpenShift AI
-
-**Documentation:** [AI quickstart: Product recommender with OpenShift AI](https://developers.redhat.com/articles/2026/01/20/ai-quickstart-product-recommender-openshift-ai)
-
----
-
-### 4. Enterprise RAG Chatbot
-**Template ID:** `redhat-ai-enterprise-rag-chatbot`
-
-Deploy a Retrieval-Augmented Generation chatbot enhanced with company-specific data stores.
-
-**Features:**
-- Multiple vector database options (Milvus, pgvector, Redis, Qdrant)
-- Configurable LLM providers (OpenShift AI, external APIs)
-- Multiple data source connectors (Confluence, SharePoint, Google Drive)
-- Automatic data synchronization
-- Document chunking and embedding pipeline
-- Customizable retrieval strategies
-
-**Technologies:**
-- Vector databases (Milvus recommended)
-- Llama 3.1 or Mistral models
-- BAAI/BGE embeddings
-- Multiple data source integrations
-
-**Use Cases:**
-- Internal knowledge base chatbots
-- Customer support automation
-- Document Q&A systems
-- Research assistance
-
----
-
-### 5. LLM CPU Serving
-**Template ID:** `redhat-ai-llm-cpu-serving`
-
-Lightweight AI assistant serving small language models on CPU infrastructure.
-
-**Features:**
-- Multiple model sizes (1B, 3B, 7B parameters)
-- CPU-optimized inference
-- INT4/INT8 quantization support
-- Response caching
-- API authentication and rate limiting
-- HuggingFace or custom model support
-
-**Technologies:**
-- TinyLlama, small Llama models
-- CPU-optimized inference engines
-- Model quantization
-- OpenShift Routes
-
-**Resource Requirements:**
-- Small (1B): 2 CPU cores, 4GB RAM
-- Medium (3B): 4 CPU cores, 8GB RAM
-- Large (7B): 8 CPU cores, 16GB RAM
-
-**Use Cases:**
-- Cost-effective AI deployments
-- Edge computing scenarios
-- Development and testing
-- Low-traffic AI services
 
 ---
 
@@ -306,16 +364,16 @@ templates/
 
 ## Examples
 
-### Example 1: Deploy LLM CPU Serving
+### Example 1: Deploy Enterprise RAG Chatbot
 
 ```bash
-# Simplest quickstart - no GPU required
-# Model: TinyLlama 1.1B
-# Resources: 2 CPU, 4GB RAM
-# Time: 5 minutes
+# RAG chatbot with PGVector
+# Local (Podman) or OpenShift (Helm)
+# Data sources: GitHub, S3/MinIO, URLs
+# Time: 10-15 minutes
 ```
 
-See [examples/llm-cpu-example-values.yaml](examples/llm-cpu-example-values.yaml)
+See [examples/rag-chatbot-example-values.yaml](examples/rag-chatbot-example-values.yaml)
 
 ### Example 2: Deploy IT Self-Service Agent
 
@@ -328,16 +386,38 @@ See [examples/llm-cpu-example-values.yaml](examples/llm-cpu-example-values.yaml)
 
 See [examples/it-agent-example-values.yaml](examples/it-agent-example-values.yaml)
 
-### Example 3: Deploy Enterprise RAG Chatbot
+### Example 3: Deploy LLM CPU Serving - HR Assistant
 
 ```bash
-# RAG chatbot with vector database
-# Vector DB: Milvus
-# Data sources: Confluence, SharePoint
-# Time: 20 minutes
+# HR Assistant on CPU - no GPU required
+# Model: TinyLlama 1.1B with vLLM
+# UI: AnythingLLM workbench
+# Time: 5-10 minutes
 ```
 
-See [examples/rag-chatbot-example-values.yaml](examples/rag-chatbot-example-values.yaml)
+See [examples/llm-cpu-example-values.yaml](examples/llm-cpu-example-values.yaml)
+
+### Example 4: Deploy AI Virtual Agent
+
+```bash
+# Conversational AI platform
+# React + FastAPI + LlamaStack
+# Knowledge bases with RAG
+# Time: 10-15 minutes
+```
+
+See [examples/ai-virtual-agent-example-values.yaml](examples/ai-virtual-agent-example-values.yaml)
+
+### Example 5: Deploy AI Observability Summarizer
+
+```bash
+# AI-powered observability platform
+# Streamlit multi-dashboard interface
+# Natural language metrics queries
+# Time: 10-15 minutes
+```
+
+See [examples/ai-observability-summarizer-example-values.yaml](examples/ai-observability-summarizer-example-values.yaml)
 
 ---
 
@@ -500,23 +580,34 @@ This project is licensed under the Apache License 2.0 - see the LICENSE file for
 
 ## Acknowledgments
 
-Based on Red Hat AI Quickstarts:
-- IT Self-Service Agent: https://github.com/rh-ai-quickstart/it-self-service-agent
-- LLM CPU Serving: https://github.com/rh-ai-quickstart/llm-cpu-serving
-- Red Hat AI Services: https://github.com/redhat-ai-services
+Based on official Red Hat AI Quickstarts (1:1 mapping):
+- **Enterprise RAG:** https://github.com/rh-ai-quickstart/RAG
+- **IT Self-Service Agent:** https://github.com/rh-ai-quickstart/it-self-service-agent
+- **LLM CPU Serving:** https://github.com/rh-ai-quickstart/llm-cpu-serving
+- **AI Virtual Agent:** https://github.com/rh-ai-quickstart/ai-virtual-agent
+- **AI Observability Summarizer:** https://github.com/rh-ai-quickstart/ai-observability-summarizer
+- **Red Hat AI Services:** https://github.com/redhat-ai-services
 
 Built for Red Hat Developer Hub (Backstage).
+
+All templates are verified against real rh-ai-quickstart repositories to ensure accuracy.
 
 ---
 
 ## What's New
 
+### Version 2.0.0 (2026-02-04)
+- **BREAKING:** Removed fake Product Recommender template (doesn't exist in rh-ai-quickstart)
+- ✅ **Verified 1:1 mapping** with real rh-ai-quickstart repositories
+- ✅ Enterprise RAG Chatbot - Based on rh-ai-quickstart/RAG
+- ✅ IT Self-Service Agent - Verified against real repo
+- ✅ LLM CPU Serving - Updated to match HR Assistant implementation
+- ✅ NEW: AI Virtual Agent - Conversational AI platform
+- ✅ NEW: AI Observability Summarizer - AI-powered monitoring
+- ✅ Generic template for flexibility
+- All templates match actual quickstart implementations
+- Updated documentation with real features and prerequisites
+- Example values for all 5 real quickstarts
+
 ### Version 1.0.0 (2026-02-04)
-- Initial release with 5 AI quickstart templates
-- Generic template for flexibility
-- IT Self-Service Agent with agentic AI
-- Product Recommender with ML pipelines
-- Enterprise RAG Chatbot with vector databases
-- LLM CPU Serving for lightweight deployments
-- Comprehensive documentation and examples
-- Production-ready manifests with security best practices
+- Initial release (contained fake Product Recommender - deprecated)
