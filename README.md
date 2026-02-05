@@ -1,6 +1,8 @@
 # Red Hat AI Quickstart Templates for Developer Hub
 
-This repository contains Backstage/Red Hat Developer Hub templates for deploying Red Hat AI Quickstarts. These templates enable teams to quickly scaffold and deploy AI-powered applications on Red Hat OpenShift AI.
+This repository contains Backstage/Red Hat Developer Hub templates for deploying Red Hat AI Quickstarts. These templates enable teams to quickly scaffold and deploy AI-powered applications on Red Hat OpenShift AI.  
+
+** Please ensure that you validate and update these template for your enterprise use.  These are example templates and should not be used in production ***
 
 ## Overview
 
@@ -8,7 +10,7 @@ Red Hat AI Quickstarts are ready-to-run, industry-specific use cases designed to
 
 ## Available Templates
 
-**All templates have 1:1 mapping with real [rh-ai-quickstart](https://github.com/rh-ai-quickstart) repositories**
+**All templates have 1:1 mapping with [rh-ai-quickstart](https://github.com/rh-ai-quickstart) repositories**
 
 ### 1. Enterprise RAG Chatbot ✅
 **Template ID:** `redhat-ai-enterprise-rag-chatbot`
@@ -597,7 +599,6 @@ All templates are verified against real rh-ai-quickstart repositories to ensure 
 ## What's New
 
 ### Version 2.0.0 (2026-02-04)
-- **BREAKING:** Removed fake Product Recommender template (doesn't exist in rh-ai-quickstart)
 - ✅ **Verified 1:1 mapping** with real rh-ai-quickstart repositories
 - ✅ Enterprise RAG Chatbot - Based on rh-ai-quickstart/RAG
 - ✅ IT Self-Service Agent - Verified against real repo
@@ -610,4 +611,4 @@ All templates are verified against real rh-ai-quickstart repositories to ensure 
 - Example values for all 5 real quickstarts
 
 ### Version 1.0.0 (2026-02-04)
-- Initial release (contained fake Product Recommender - deprecated)
+- Initial release 
