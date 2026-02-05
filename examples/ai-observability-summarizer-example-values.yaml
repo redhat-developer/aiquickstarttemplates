@@ -1,0 +1,86 @@
+# Example parameter values for AI Observability Summarizer template
+# Based on rh-ai-quickstart/ai-observability-summarizer repository
+# Use these as a reference when filling out the template form
+
+name: "ai-observability"
+owner: "platform-team"
+description: "AI-powered observability platform for OpenShift AI workloads"
+
+# OpenShift Configuration
+openshiftCluster: "https://api.prod-cluster.example.com:6443"
+namespace: "ai-observability"
+openshiftAIVersion: "2.16.2+"
+
+# LLM Model
+llmModel: "llama-3-2-3b-instruct"  # Options: 1b, 1b-quantized, 3b, 8b, 70b
+enableGPU: false  # Set to true for larger models (8b, 70b)
+# gpuToleration: "nvidia.com/gpu"
+
+# Observability Components
+enableTempo: true  # Distributed tracing
+enableLoki: true   # Log aggregation
+enableOpenTelemetry: true  # Trace collection
+enableMinio: true  # Object storage
+minioStorageSize: "50Gi"
+
+# Monitoring
+enableVLLMMonitoring: true  # Monitor vLLM model serving
+enableDCGMMonitoring: false  # GPU metrics (requires GPU nodes)
+prometheusRetention: "15d"
+
+# Alerting
+enableAlerts: true
+slackWebhookUrl: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+alertThresholds:
+  gpuUtilization: 85
+  memoryUsage: 90
+
+# Dashboards
+enableMultiDashboard: true
+dashboards:
+  - vllm-metrics
+  - openshift-metrics
+  - chat-interface
+
+# Report Generation
+enableReportGeneration: true
+reportFormats:
+  - html
+  - markdown
+
+# MCP Integration
+enableMCPServer: true  # For Claude Desktop/Cursor integration
+
+# Resources
+cpuRequest: "4"  # Options: "2", "4", "8"
+memoryRequest: "8Gi"  # Options: "8Gi", "16Gi", "32Gi"
+storageSize: "50Gi"
+
+# Prerequisites Check (REQUIRED!)
+hasServiceMesh: true
+hasServerless: true
+hasPrometheus: true
+
+# Repository
+createGitRepo: true
+repoUrl: "github.com/your-org/ai-observability"
+
+# ---
+# Deployment creates:
+# - llm-service (LLM inference engine)
+# - llama-stack (Backend API)
+# - metric-ui (Streamlit multi-dashboard)
+# - mcp-server (Model Context Protocol)
+# - tempo (Distributed tracing)
+# - loki (Log aggregation)
+# - otel-collector (OpenTelemetry)
+# - minio (Object storage)
+#
+# Access via: oc get route -n ai-observability
+#
+# Example queries:
+# - "How is my GPU performing?"
+# - "What's my AI infrastructure cost?"
+# - "Show me vLLM latency trends"
+#
+# Estimated deployment time: 10-15 minutes

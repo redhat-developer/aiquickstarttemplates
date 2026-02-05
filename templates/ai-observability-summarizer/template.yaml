@@ -1,0 +1,705 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: redhat-ai-observability-summarizer
+  title: AI Observability Summarizer
+  description: Transform complex metrics into actionable insights with AI-powered monitoring based on rh-ai-quickstart/ai-observability-summarizer
+  tags:
+    - redhat
+    - ai
+    - observability
+    - openshift-ai
+    - prometheus
+    - tempo
+    - loki
+    - monitoring
+    - streamlit
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Project Information
+      required:
+        - name
+        - owner
+      properties:
+        name:
+          title: Project Name
+          type: string
+          description: Name for your AI Observability Summarizer instance
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+          default: ai-observability
+        owner:
+          title: Owner
+          type: string
+          description: Team or individual owning this platform
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+        description:
+          title: Description
+          type: string
+          description: Purpose of this observability deployment
+          default: AI-powered observability platform for OpenShift AI workloads
+
+    - title: OpenShift Configuration
+      required:
+        - openshiftCluster
+        - namespace
+      properties:
+        openshiftCluster:
+          title: OpenShift Cluster
+          type: string
+          description: Target OpenShift cluster URL
+          default: https://api.cluster.example.com:6443
+          ui:help: Requires OpenShift 4.16.24+
+        namespace:
+          title: Namespace/Project
+          type: string
+          description: OpenShift namespace for deployment
+          default: ai-observability
+        openshiftAIVersion:
+          title: OpenShift AI Version
+          type: string
+          description: OpenShift AI version
+          default: 2.16.2+
+          ui:help: Requires OpenShift AI 2.16.2 or later
+
+    - title: LLM Model Configuration
+      required:
+        - llmModel
+      properties:
+        llmModel:
+          title: LLM Model for AI Insights
+          type: string
+          description: Model for generating observability insights
+          default: llama-3-2-3b-instruct
+          enum:
+            - llama-3-2-1b-instruct
+            - llama-3-2-1b-instruct-quantized
+            - llama-3-2-3b-instruct
+            - llama-3-1-8b-instruct
+            - llama-3-3-70b-instruct
+          enumNames:
+            - Llama 3.2 1B (Fastest, minimal resources)
+            - Llama 3.2 1B Quantized (Optimized for CPU)
+            - Llama 3.2 3B (Recommended - balanced)
+            - Llama 3.1 8B (Better quality, more resources)
+            - Llama 3.3 70B (Best quality, requires GPU)
+        enableGPU:
+          title: Enable GPU Acceleration
+          type: boolean
+          description: Use GPU for LLM inference
+          default: false
+          ui:help: Recommended for larger models (8B, 70B)
+        gpuToleration:
+          title: GPU Toleration
+          type: string
+          description: GPU node toleration key
+          default: nvidia.com/gpu
+          ui:hidden:
+            enableGPU: false
+
+    - title: Observability Components
+      properties:
+        enableTempo:
+          title: Enable Tempo (Distributed Tracing)
+          type: boolean
+          description: Deploy Tempo for trace storage and analysis
+          default: true
+        enableLoki:
+          title: Enable Loki (Log Aggregation)
+          type: boolean
+          description: Deploy Loki for centralized logging
+          default: true
+        enableOpenTelemetry:
+          title: Enable OpenTelemetry Collector
+          type: boolean
+          description: Deploy OTel Collector for trace collection
+          default: true
+        enableMinio:
+          title: Enable MinIO (Object Storage)
+          type: boolean
+          description: Deploy MinIO for traces and logs storage
+          default: true
+        minioStorageSize:
+          title: MinIO Storage Size
+          type: string
+          description: Storage size for MinIO
+          default: 50Gi
+          ui:hidden:
+            enableMinio: false
+
+    - title: Monitoring Configuration
+      properties:
+        enableVLLMMonitoring:
+          title: Enable vLLM Monitoring
+          type: boolean
+          description: Monitor vLLM model serving metrics
+          default: true
+        enableDCGMMonitoring:
+          title: Enable DCGM GPU Monitoring
+          type: boolean
+          description: Monitor GPU metrics with NVIDIA DCGM
+          default: false
+          ui:help: Requires GPU nodes with DCGM exporter
+        prometheusRetention:
+          title: Prometheus Retention Period
+          type: string
+          description: How long to retain metrics
+          default: 15d
+          enum:
+            - 7d
+            - 15d
+            - 30d
+            - 90d
+
+    - title: Alerting Configuration
+      properties:
+        enableAlerts:
+          title: Enable AI-Powered Alerts
+          type: boolean
+          description: Enable alert rules and notifications
+          default: false
+        slackWebhookUrl:
+          title: Slack Webhook URL
+          type: string
+          description: Slack webhook for AI-generated alerts
+          ui:widget: password
+          ui:help: Get from Slack Incoming Webhooks app
+          ui:hidden:
+            enableAlerts: false
+        alertThresholds:
+          title: Alert Thresholds
+          type: object
+          description: Custom alert thresholds
+          properties:
+            gpuUtilization:
+              title: GPU Utilization Threshold
+              type: number
+              default: 85
+              ui:help: Alert when GPU usage exceeds this percentage
+            memoryUsage:
+              title: Memory Usage Threshold
+              type: number
+              default: 90
+              ui:help: Alert when memory usage exceeds this percentage
+          ui:hidden:
+            enableAlerts: false
+
+    - title: Dashboard Configuration
+      properties:
+        enableMultiDashboard:
+          title: Enable Multi-Dashboard Interface
+          type: boolean
+          description: Deploy Streamlit multi-dashboard UI
+          default: true
+        dashboards:
+          title: Dashboards to Enable
+          type: array
+          description: Select dashboards to deploy
+          items:
+            type: string
+            enum:
+              - vllm-metrics
+              - openshift-metrics
+              - chat-interface
+              - gpu-monitoring
+          uniqueItems: true
+          default:
+            - vllm-metrics
+            - openshift-metrics
+            - chat-interface
+          ui:hidden:
+            enableMultiDashboard: false
+
+    - title: Report Generation
+      properties:
+        enableReportGeneration:
+          title: Enable Report Generation
+          type: boolean
+          description: Allow exporting reports in HTML/PDF/Markdown
+          default: true
+        reportFormats:
+          title: Supported Report Formats
+          type: array
+          description: Formats for report export
+          items:
+            type: string
+            enum:
+              - html
+              - pdf
+              - markdown
+          uniqueItems: true
+          default:
+            - html
+            - markdown
+          ui:hidden:
+            enableReportGeneration: false
+
+    - title: MCP Integration
+      properties:
+        enableMCPServer:
+          title: Enable MCP Server
+          type: boolean
+          description: Deploy Model Context Protocol server for Claude/Cursor
+          default: true
+          ui:help: Allows AI assistants to query observability data
+
+    - title: Resource Configuration
+      properties:
+        cpuRequest:
+          title: CPU Request
+          type: string
+          description: CPU cores requested
+          default: "4"
+          enum:
+            - "2"
+            - "4"
+            - "8"
+          enumNames:
+            - 2 cores (Minimum)
+            - 4 cores (Recommended)
+            - 8 cores (Optimal)
+        memoryRequest:
+          title: Memory Request
+          type: string
+          description: Memory requested
+          default: 8Gi
+          enum:
+            - 8Gi
+            - 16Gi
+            - 32Gi
+          enumNames:
+            - 8 GB (Minimum)
+            - 16 GB (Recommended)
+            - 32 GB (Optimal)
+        storageSize:
+          title: Total Storage Size
+          type: string
+          description: Total persistent storage
+          default: 50Gi
+
+    - title: Prerequisites Check
+      properties:
+        hasServiceMesh:
+          title: OpenShift Service Mesh Installed
+          type: boolean
+          description: Confirm Service Mesh is installed
+          default: false
+          ui:help: Required for deployment
+        hasServerless:
+          title: OpenShift Serverless Installed
+          type: boolean
+          description: Confirm Serverless is installed
+          default: false
+          ui:help: Required for deployment
+        hasPrometheus:
+          title: Prometheus/Thanos Available
+          type: boolean
+          description: Confirm Prometheus monitoring is available
+          default: true
+          ui:help: Required for metrics collection
+
+    - title: Repository Configuration
+      properties:
+        createGitRepo:
+          title: Create New Git Repository
+          type: boolean
+          description: Publish to a new GitHub repository
+          default: true
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+          ui:hidden:
+            createGitRepo: false
+
+  steps:
+    - id: fetch-base
+      name: Fetch AI Observability Summarizer
+      action: fetch:plain
+      input:
+        url: https://github.com/rh-ai-quickstart/ai-observability-summarizer
+        targetPath: ./ai-observability
+
+    - id: create-deployment-script
+      name: Create Deployment Script
+      action: fetch:template
+      input:
+        targetPath: ./ai-observability
+        values:
+          namespace: ${{ parameters.namespace }}
+          name: ${{ parameters.name }}
+          llmModel: ${{ parameters.llmModel }}
+          enableGPU: ${{ parameters.enableGPU }}
+          gpuToleration: ${{ parameters.gpuToleration }}
+          enableAlerts: ${{ parameters.enableAlerts }}
+        content: |
+          #!/bin/bash
+          # Deployment script for ${{ parameters.name }}
+
+          set -e
+
+          NAMESPACE="${{ parameters.namespace }}"
+          LLM="${{ parameters.llmModel }}"
+
+          echo "🚀 Deploying AI Observability Summarizer: ${{ parameters.name }}"
+          echo "   Namespace: ${NAMESPACE}"
+          echo "   LLM Model: ${LLM}"
+
+          # Check prerequisites
+          echo "🔍 Checking prerequisites..."
+          if ! command -v oc &> /dev/null; then
+              echo "❌ OpenShift CLI (oc) not found"
+              exit 1
+          fi
+
+          if ! command -v helm &> /dev/null; then
+              echo "⚠️  Helm not found (optional but recommended)"
+          fi
+
+          # Deploy
+          echo "📦 Deploying..."
+          {% if parameters.enableGPU %}
+          make install NAMESPACE=${NAMESPACE} LLM=${LLM} LLM_TOLERATION="{{ parameters.gpuToleration }}" {% if parameters.enableAlerts %}ALERTS=TRUE{% endif %}
+          {% else %}
+          make install NAMESPACE=${NAMESPACE} LLM=${LLM} {% if parameters.enableAlerts %}ALERTS=TRUE{% endif %}
+          {% endif %}
+
+          echo "✅ Deployment initiated!"
+          echo ""
+          echo "Monitor pods:"
+          echo "  oc get pods -n ${NAMESPACE} -w"
+          echo ""
+          echo "View routes:"
+          echo "  oc get route -n ${NAMESPACE}"
+          echo ""
+          echo "Access dashboards via OpenShift console"
+
+    - id: create-readme
+      name: Create Deployment README
+      action: fetch:template
+      input:
+        targetPath: ./ai-observability
+        values:
+          name: ${{ parameters.name }}
+          namespace: ${{ parameters.namespace }}
+          llmModel: ${{ parameters.llmModel }}
+          enableAlerts: ${{ parameters.enableAlerts }}
+          enableTempo: ${{ parameters.enableTempo }}
+          enableLoki: ${{ parameters.enableLoki }}
+        content: |
+          # ${{ parameters.name }} - AI Observability Summarizer
+
+          Transform complex OpenShift AI metrics into actionable business insights.
+
+          ## Overview
+
+          Monitor your AI models the smart way. Get instant answers about performance,
+          costs, and problems—in plain English, not technical jargon.
+
+          - **LLM Model**: ${{ parameters.llmModel }}
+          - **Distributed Tracing**: ${{ parameters.enableTempo ? '✅ Tempo' : '❌' }}
+          - **Log Aggregation**: ${{ parameters.enableLoki ? '✅ Loki' : '❌' }}
+          - **AI Alerts**: ${{ parameters.enableAlerts ? '✅ Enabled' : '❌ Disabled' }}
+
+          ## Features
+
+          - 🤖 Natural language queries about AI infrastructure
+          - 📊 Multi-dashboard Streamlit interface
+          - 📈 GPU & vLLM performance monitoring
+          - 🔔 AI-powered Slack alerts
+          - 📄 HTML/PDF/Markdown report generation
+          - 🔍 Distributed tracing with Tempo
+          - 📝 Centralized logging with Loki
+          - 🔌 MCP server for Claude Desktop/Cursor
+
+          ## Prerequisites
+
+          Ensure these are installed on OpenShift:
+          - ✅ OpenShift 4.16.24+
+          - ✅ OpenShift AI 2.16.2+
+          - ✅ Service Mesh
+          - ✅ Serverless
+          - ✅ Prometheus/Thanos
+
+          ## Quick Start
+
+          ### Deploy
+
+          ```bash
+          # Login to OpenShift
+          oc login --token=<token> --server=${{ parameters.openshiftCluster }}
+
+          # Run deployment script
+          chmod +x deploy.sh
+          ./deploy.sh
+          ```
+
+          **OR manually:**
+
+          ```bash
+          make install NAMESPACE=${{ parameters.namespace }} LLM=${{ parameters.llmModel }}
+          ```
+
+          {% if parameters.enableAlerts %}
+          **With Slack alerts:**
+
+          ```bash
+          make install NAMESPACE=${{ parameters.namespace }} LLM=${{ parameters.llmModel }} ALERTS=TRUE
+          ```
+          {% endif %}
+
+          ### Monitor Deployment
+
+          ```bash
+          oc get pods -n ${{ parameters.namespace }} -w
+          ```
+
+          Expected components:
+          - llm-service (LLM inference)
+          - llama-stack (Backend API)
+          - metric-ui (Streamlit dashboards)
+          - mcp-server (Model Context Protocol)
+          {% if parameters.enableTempo %}
+          - tempo (Distributed tracing)
+          {% endif %}
+          {% if parameters.enableLoki %}
+          - loki (Log aggregation)
+          {% endif %}
+          {% if parameters.enableOpenTelemetry %}
+          - otel-collector (OpenTelemetry)
+          {% endif %}
+          {% if parameters.enableMinio %}
+          - minio (Object storage)
+          {% endif %}
+
+          ### Access Dashboards
+
+          ```bash
+          oc get route -n ${{ parameters.namespace }}
+          ```
+
+          Navigate to the metric-ui route for the Streamlit interface.
+
+          **Available dashboards:**
+          - vLLM Metrics: Model serving performance
+          - OpenShift Metrics: Infrastructure monitoring
+          - Chat Interface: Ask questions in natural language
+          - GPU Monitoring: DCGM metrics (if enabled)
+
+          ## Example Queries
+
+          Ask questions like:
+          - "How is my GPU performing?"
+          - "What's my AI infrastructure cost this month?"
+          - "Are there any performance issues?"
+          - "Show me vLLM latency trends"
+          - "Which models are using the most resources?"
+
+          ## Architecture
+
+          ```
+          ┌─────────────────────────────────────────┐
+          │   Streamlit Multi-Dashboard UI          │
+          │   - vLLM Metrics                        │
+          │   - OpenShift Metrics                   │
+          │   - Chat Interface                      │
+          └──────────────┬──────────────────────────┘
+                         │
+          ┌──────────────▼──────────────────────────┐
+          │   Llama Stack (Backend API)             │
+          │   LLM: ${{ parameters.llmModel }}       │
+          └──────┬───────────┬──────────────────────┘
+                 │           │
+          ┌──────▼──────┐ ┌──▼─────────────────────┐
+          │ Prometheus  │ │ Tempo + Loki           │
+          │ Metrics     │ │ Traces + Logs          │
+          └─────────────┘ └────────────────────────┘
+          ```
+
+          ## Configuration
+
+          View available models:
+
+          ```bash
+          make list-models
+          ```
+
+          Deploy with custom model:
+
+          ```bash
+          make install NAMESPACE=${{ parameters.namespace }} LLM=llama-3-1-8b-instruct
+          ```
+
+          {% if parameters.enableGPU %}
+          With GPU:
+
+          ```bash
+          make install NAMESPACE=${{ parameters.namespace }} LLM=${{ parameters.llmModel }} LLM_TOLERATION=nvidia.com/gpu
+          ```
+          {% endif %}
+
+          ## MCP Integration
+
+          Connect to Claude Desktop or Cursor:
+
+          1. Deploy MCP server (included by default)
+          2. Get MCP server route: `oc get route mcp-server -n ${{ parameters.namespace }}`
+          3. Configure Claude/Cursor with MCP endpoint
+          4. Ask questions about your AI infrastructure directly from your IDE
+
+          ## Cleanup
+
+          ```bash
+          make uninstall NAMESPACE=${{ parameters.namespace }}
+          ```
+
+          ## References
+
+          - [AI Observability Summarizer](https://github.com/rh-ai-quickstart/ai-observability-summarizer)
+          - [OpenShift AI Monitoring](https://docs.redhat.com/en/documentation/red_hat_openshift_ai)
+          - [Prometheus](https://prometheus.io/)
+          - [Tempo](https://grafana.com/oss/tempo/)
+          - [Loki](https://grafana.com/oss/loki/)
+
+    - id: create-catalog-info
+      name: Create Catalog Info
+      action: fetch:template
+      input:
+        targetPath: ./ai-observability
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          namespace: ${{ parameters.namespace }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+        content: |
+          apiVersion: backstage.io/v1alpha1
+          kind: Component
+          metadata:
+            name: ${{ parameters.name }}
+            description: ${{ parameters.description }}
+            annotations:
+              backstage.io/kubernetes-namespace: ${{ parameters.namespace }}
+              openshift.io/cluster: ${{ parameters.openshiftCluster }}
+              github.com/project-slug: ${{ parameters.repoUrl | parseRepoUrl }}
+              docs.redhat.com/quickstart-type: ai-observability-summarizer
+            tags:
+              - ai
+              - observability
+              - monitoring
+              - prometheus
+              - tempo
+              - loki
+              - streamlit
+              - openshift-ai
+            links:
+              - url: https://github.com/rh-ai-quickstart/ai-observability-summarizer
+                title: AI Observability Repository
+                icon: github
+          spec:
+            type: service
+            lifecycle: production
+            owner: ${{ parameters.owner }}
+            system: ai-platform
+            providesApis:
+              - observability-api
+            dependsOn:
+              - resource:prometheus
+              - resource:openshift-ai
+              {% if parameters.enableTempo %}
+              - resource:tempo
+              {% endif %}
+              {% if parameters.enableLoki %}
+              - resource:loki
+              {% endif %}
+
+    - id: publish
+      name: Publish to GitHub
+      if: ${{ parameters.createGitRepo }}
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        repoVisibility: private
+        sourcePath: ./ai-observability
+
+    - id: register
+      name: Register Component
+      if: ${{ parameters.createGitRepo }}
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
+      - title: OpenShift Console
+        url: ${{ parameters.openshiftCluster }}/k8s/cluster/projects/${{ parameters.namespace }}
+        icon: dashboard
+      - title: AI Observability Docs
+        url: https://github.com/rh-ai-quickstart/ai-observability-summarizer
+        icon: docs
+    text:
+      - title: Next Steps
+        content: |
+          Your AI Observability Summarizer has been configured!
+
+          **LLM**: ${{ parameters.llmModel }}
+          **Dashboards**: ${{ parameters.dashboards | join(', ') }}
+          **Alerts**: ${{ parameters.enableAlerts ? '✅ Enabled with Slack' : '❌ Disabled' }}
+
+          ## Prerequisites Check
+
+          Before deploying, ensure:
+          - [ ] OpenShift 4.16.24+ running
+          - [ ] OpenShift AI 2.16.2+ installed
+          - [ ] Service Mesh: ${{ parameters.hasServiceMesh ? '✅' : '❌' }}
+          - [ ] Serverless: ${{ parameters.hasServerless ? '✅' : '❌' }}
+          - [ ] Prometheus: ${{ parameters.hasPrometheus ? '✅' : '❌' }}
+
+          ## Deploy Now
+
+          ```bash
+          cd ai-observability
+          chmod +x deploy.sh
+          ./deploy.sh
+          ```
+
+          OR manually:
+
+          ```bash
+          make install NAMESPACE=${{ parameters.namespace }} LLM=${{ parameters.llmModel }}
+          ```
+
+          ## Monitor Progress
+
+          ```bash
+          oc get pods -n ${{ parameters.namespace }} -w
+          ```
+
+          ## Access Dashboards
+
+          ```bash
+          oc get route -n ${{ parameters.namespace }}
+          ```
+
+          Navigate to metric-ui route for Streamlit dashboards.
+
+          **Estimated deployment time**: 10-15 minutes
