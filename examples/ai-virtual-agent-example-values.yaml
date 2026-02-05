@@ -1,0 +1,64 @@
+# Example parameter values for AI Virtual Agent Platform template
+# Based on rh-ai-quickstart/ai-virtual-agent repository
+# Use these as a reference when filling out the template form
+
+name: "ai-virtual-agent"
+owner: "ai-team"
+description: "Conversational AI agent platform with RAG and knowledge bases"
+
+# Deployment Mode
+deploymentMode: "openshift"  # Options: local, openshift
+openshiftCluster: "https://api.prod-cluster.example.com:6443"
+namespace: "ai-virtual-agent"
+hasClusterAdmin: true  # REQUIRED for OpenShift deployment
+
+# LLM Configuration
+llmProvider: "llamastack-local"  # Options: llamastack-local, vllm-remote, vertex-ai, openai
+llmModel: "llama3.2:3b-instruct-fp16"
+huggingfaceToken: "hf_yourTokenHere"  # Use secret management!
+
+# For external LLM providers:
+# externalLLMEndpoint: "https://your-vllm-server.com/v1"
+# externalLLMApiKey: "your-api-key"
+
+# Database Configuration
+postgresStorage: "20Gi"
+enablePgvector: true  # Required for RAG
+
+# Agent Features
+enableKnowledgeBases: true  # RAG with document upload
+enableWebSearch: false
+# webSearchApiKey: "your-tavily-api-key"
+enableMCPServers: true  # Model Context Protocol integration
+
+# Safety & Guardrails
+enableSafetyGuardrails: true
+safetyLevel: "moderate"  # Options: permissive, moderate, strict
+
+# Frontend
+enableFrontend: true
+frontendTheme: "light"  # Options: light, dark
+
+# Storage & Attachments
+enableAttachments: true
+minioStorageSize: "50Gi"
+
+# Repository
+createGitRepo: true
+repoUrl: "github.com/your-org/ai-virtual-agent"
+
+# ---
+# Deployment creates:
+# - frontend (React + PatternFly UI)
+# - backend (FastAPI server)
+# - llamastack (AI inference platform)
+# - postgres (Database with pgvector)
+# - minio (Object storage for attachments)
+#
+# Access frontend via: oc get route -n ai-virtual-agent
+#
+# Estimated deployment time: 10-15 minutes
+#
+# For local development:
+# deploymentMode: local
+# Access at: http://localhost:5173 (frontend), http://localhost:8000 (API)

@@ -1,0 +1,779 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: redhat-ai-virtual-agent
+  title: AI Virtual Agent Platform
+  description: Deploy conversational AI agents with RAG, MCP servers, and knowledge bases on OpenShift based on rh-ai-quickstart/ai-virtual-agent
+  tags:
+    - redhat
+    - ai
+    - virtual-agent
+    - openshift-ai
+    - llamastack
+    - fastapi
+    - react
+    - mcp
+    - rag
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Project Information
+      required:
+        - name
+        - owner
+      properties:
+        name:
+          title: Project Name
+          type: string
+          description: Name for your AI Virtual Agent platform
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+          default: ai-virtual-agent
+        owner:
+          title: Owner
+          type: string
+          description: Team or individual owning this platform
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+        description:
+          title: Description
+          type: string
+          description: Purpose of this virtual agent deployment
+          default: Conversational AI agent platform with RAG and knowledge bases
+
+    - title: Deployment Configuration
+      required:
+        - deploymentMode
+        - namespace
+      properties:
+        deploymentMode:
+          title: Deployment Mode
+          type: string
+          description: Choose deployment target
+          default: openshift
+          enum:
+            - local
+            - openshift
+          enumNames:
+            - Local (Docker Compose - Limited functionality)
+            - OpenShift (Full platform with all features)
+        openshiftCluster:
+          title: OpenShift Cluster
+          type: string
+          description: Target OpenShift cluster URL
+          default: https://api.cluster.example.com:6443
+          ui:hidden:
+            deploymentMode: local
+        namespace:
+          title: Namespace/Project
+          type: string
+          description: OpenShift namespace for deployment
+          default: ai-virtual-agent
+        hasClusterAdmin:
+          title: Have Cluster Admin Access
+          type: boolean
+          description: Confirm cluster admin access for OAuth and ClusterRole
+          default: false
+          ui:help: Required for ClusterRole resource and OAuth authentication
+          ui:hidden:
+            deploymentMode: local
+
+    - title: LLM Configuration
+      required:
+        - llmProvider
+      properties:
+        llmProvider:
+          title: LLM Provider
+          type: string
+          description: Choose LLM inference provider
+          default: llamastack-local
+          enum:
+            - llamastack-local
+            - vllm-remote
+            - vertex-ai
+            - openai
+          enumNames:
+            - LlamaStack Local (Ollama - Requires GPU)
+            - Remote vLLM Endpoint
+            - Google Vertex AI
+            - OpenAI API
+        llmModel:
+          title: LLM Model
+          type: string
+          description: Model for agent reasoning
+          default: llama3.2:3b-instruct-fp16
+          enum:
+            - llama3.2:3b-instruct-fp16
+            - llama3.1:8b-instruct
+            - llama3.1:70b-instruct
+          ui:hidden:
+            llmProvider:
+              not:
+                const: llamastack-local
+        huggingfaceToken:
+          title: Hugging Face Token
+          type: string
+          description: HF token for accessing gated models
+          ui:widget: password
+          ui:help: Required for some models that need authorization
+        externalLLMEndpoint:
+          title: External LLM Endpoint
+          type: string
+          description: URL for remote LLM service
+          ui:hidden:
+            llmProvider: llamastack-local
+        externalLLMApiKey:
+          title: External LLM API Key
+          type: string
+          description: API key for external LLM
+          ui:widget: password
+          ui:hidden:
+            llmProvider: llamastack-local
+
+    - title: Database Configuration
+      properties:
+        postgresStorage:
+          title: PostgreSQL Storage Size
+          type: string
+          description: Persistent volume size for PostgreSQL
+          default: 20Gi
+        enablePgvector:
+          title: Enable pgvector Extension
+          type: boolean
+          description: Enable vector similarity search
+          default: true
+          ui:help: Required for RAG knowledge bases
+
+    - title: Agent Features
+      properties:
+        enableKnowledgeBases:
+          title: Enable Knowledge Bases
+          type: boolean
+          description: Allow agents to access uploaded documents via RAG
+          default: true
+        enableWebSearch:
+          title: Enable Web Search Tool
+          type: boolean
+          description: Allow agents to search the web
+          default: false
+        webSearchApiKey:
+          title: Web Search API Key
+          type: string
+          description: API key for web search service (Tavily, Bing, etc.)
+          ui:widget: password
+          ui:hidden:
+            enableWebSearch: false
+        enableMCPServers:
+          title: Enable MCP Servers
+          type: boolean
+          description: Enable Model Context Protocol server integration
+          default: true
+          ui:help: Connect enterprise databases and external systems
+
+    - title: Safety & Guardrails
+      properties:
+        enableSafetyGuardrails:
+          title: Enable Safety Guardrails
+          type: boolean
+          description: Apply content filtering and safety controls
+          default: true
+        safetyLevel:
+          title: Safety Level
+          type: string
+          description: Level of content filtering
+          default: moderate
+          enum:
+            - permissive
+            - moderate
+            - strict
+          ui:hidden:
+            enableSafetyGuardrails: false
+
+    - title: Frontend Configuration
+      properties:
+        enableFrontend:
+          title: Deploy Frontend UI
+          type: boolean
+          description: Deploy React frontend with PatternFly
+          default: true
+        frontendTheme:
+          title: UI Theme
+          type: string
+          description: Default UI theme
+          default: light
+          enum:
+            - light
+            - dark
+          ui:hidden:
+            enableFrontend: false
+
+    - title: Storage & Attachments
+      properties:
+        enableAttachments:
+          title: Enable File Attachments
+          type: boolean
+          description: Allow file uploads via MinIO
+          default: true
+          ui:help: Requires MinIO object storage
+        minioStorageSize:
+          title: MinIO Storage Size
+          type: string
+          description: Storage size for file attachments
+          default: 50Gi
+          ui:hidden:
+            enableAttachments: false
+
+    - title: Repository Configuration
+      properties:
+        createGitRepo:
+          title: Create New Git Repository
+          type: boolean
+          description: Publish to a new GitHub repository
+          default: true
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+          ui:hidden:
+            createGitRepo: false
+
+  steps:
+    - id: fetch-base
+      name: Fetch AI Virtual Agent Platform
+      action: fetch:plain
+      input:
+        url: https://github.com/rh-ai-quickstart/ai-virtual-agent
+        targetPath: ./ai-virtual-agent
+
+    - id: create-env-file
+      name: Generate Environment Configuration
+      action: fetch:template
+      input:
+        targetPath: ./ai-virtual-agent
+        values:
+          deploymentMode: ${{ parameters.deploymentMode }}
+          namespace: ${{ parameters.namespace }}
+          llmProvider: ${{ parameters.llmProvider }}
+          llmModel: ${{ parameters.llmModel }}
+          huggingfaceToken: ${{ parameters.huggingfaceToken }}
+          externalLLMEndpoint: ${{ parameters.externalLLMEndpoint }}
+          externalLLMApiKey: ${{ parameters.externalLLMApiKey }}
+          enableAttachments: ${{ parameters.enableAttachments }}
+          enableKnowledgeBases: ${{ parameters.enableKnowledgeBases }}
+          enableWebSearch: ${{ parameters.enableWebSearch }}
+          webSearchApiKey: ${{ parameters.webSearchApiKey }}
+        content: |
+          # Environment configuration for ${{ parameters.name }}
+          # Based on rh-ai-quickstart/ai-virtual-agent
+
+          # Database
+          DATABASE_URL=postgresql+asyncpg://admin:password@postgres:5432/ai_virtual_agent
+
+          # LLM Configuration
+          LLM_PROVIDER=${{ parameters.llmProvider }}
+          {% if parameters.llmModel %}
+          LLM_MODEL=${{ parameters.llmModel }}
+          {% endif %}
+          {% if parameters.huggingfaceToken %}
+          HUGGINGFACE_TOKEN=${{ parameters.huggingfaceToken }}
+          {% endif %}
+          {% if parameters.externalLLMEndpoint %}
+          EXTERNAL_LLM_ENDPOINT=${{ parameters.externalLLMEndpoint }}
+          {% endif %}
+          {% if parameters.externalLLMApiKey %}
+          EXTERNAL_LLM_API_KEY=${{ parameters.externalLLMApiKey }}
+          {% endif %}
+
+          # Features
+          ENABLE_KNOWLEDGE_BASES=${{ parameters.enableKnowledgeBases }}
+          ENABLE_WEB_SEARCH=${{ parameters.enableWebSearch }}
+          {% if parameters.webSearchApiKey %}
+          WEB_SEARCH_API_KEY=${{ parameters.webSearchApiKey }}
+          {% endif %}
+          ENABLE_MCP_SERVERS=${{ parameters.enableMCPServers }}
+          ENABLE_SAFETY_GUARDRAILS=${{ parameters.enableSafetyGuardrails }}
+          {% if parameters.enableSafetyGuardrails %}
+          SAFETY_LEVEL=${{ parameters.safetyLevel }}
+          {% endif %}
+
+          # Storage
+          DISABLE_ATTACHMENTS=${{ 'false' if parameters.enableAttachments else 'true' }}
+
+          # Local Development
+          {% if parameters.deploymentMode == 'local' %}
+          LOCAL_DEV_ENV_MODE=true
+          {% endif %}
+
+    - id: create-openshift-deployment
+      name: Generate OpenShift Deployment Configuration
+      if: ${{ parameters.deploymentMode == 'openshift' }}
+      action: fetch:template
+      input:
+        targetPath: ./ai-virtual-agent/deploy/cluster
+        values:
+          namespace: ${{ parameters.namespace }}
+          name: ${{ parameters.name }}
+          postgresStorage: ${{ parameters.postgresStorage }}
+          minioStorageSize: ${{ parameters.minioStorageSize }}
+          enableAttachments: ${{ parameters.enableAttachments }}
+          enablePgvector: ${{ parameters.enablePgvector }}
+        content: |
+          # OpenShift deployment values for ${{ parameters.name }}
+
+          namespace: ${{ parameters.namespace }}
+
+          postgres:
+            storage: ${{ parameters.postgresStorage }}
+            extensions:
+              {% if parameters.enablePgvector %}
+              - pgvector
+              {% endif %}
+
+          {% if parameters.enableAttachments %}
+          minio:
+            enabled: true
+            storage: ${{ parameters.minioStorageSize }}
+          {% endif %}
+
+          llamastack:
+            provider: ${{ parameters.llmProvider }}
+            {% if parameters.llmModel %}
+            model: ${{ parameters.llmModel }}
+            {% endif %}
+
+          frontend:
+            enabled: ${{ parameters.enableFrontend }}
+            {% if parameters.frontendTheme %}
+            theme: ${{ parameters.frontendTheme }}
+            {% endif %}
+
+    - id: create-deployment-script
+      name: Create Deployment Script
+      action: fetch:template
+      input:
+        targetPath: ./ai-virtual-agent
+        values:
+          deploymentMode: ${{ parameters.deploymentMode }}
+          namespace: ${{ parameters.namespace }}
+          name: ${{ parameters.name }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+        content: |
+          #!/bin/bash
+          # Deployment script for ${{ parameters.name }}
+
+          set -e
+
+          {% if parameters.deploymentMode == 'openshift' %}
+          echo "🚀 Deploying AI Virtual Agent Platform: ${{ parameters.name }}"
+
+          # Login to OpenShift
+          echo "🔐 Login to OpenShift..."
+          # oc login --token=<token> --server=${{ parameters.openshiftCluster }}
+
+          # Deploy using Makefile
+          cd deploy/cluster
+          make install NAMESPACE=${{ parameters.namespace }}
+
+          echo "✅ Deployment initiated!"
+          echo ""
+          echo "Monitor deployment:"
+          echo "  oc get pods -n ${{ parameters.namespace }} -w"
+          echo ""
+          echo "Access frontend:"
+          echo "  oc get route -n ${{ parameters.namespace }}"
+
+          {% else %}
+          echo "🚀 Starting AI Virtual Agent Platform locally: ${{ parameters.name }}"
+
+          cd deploy/local
+          make compose-up
+
+          echo "✅ Local deployment started!"
+          echo ""
+          echo "Access points:"
+          echo "  Frontend: http://localhost:5173"
+          echo "  API: http://localhost:8000"
+          echo "  API Docs: http://localhost:8000/docs"
+          echo ""
+          echo "Note: Limited functionality in local mode"
+          echo "For full features, deploy to OpenShift"
+          {% endif %}
+
+    - id: create-readme
+      name: Create Deployment README
+      action: fetch:template
+      input:
+        targetPath: ./ai-virtual-agent
+        values:
+          name: ${{ parameters.name }}
+          deploymentMode: ${{ parameters.deploymentMode }}
+          namespace: ${{ parameters.namespace }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+          llmProvider: ${{ parameters.llmProvider }}
+        content: |
+          # ${{ parameters.name }} - AI Virtual Agent Platform
+
+          Conversational AI agent platform with RAG, knowledge bases, and MCP server integration.
+
+          ## Overview
+
+          - **Deployment**: ${{ parameters.deploymentMode }}
+          - **LLM Provider**: ${{ parameters.llmProvider }}
+          - **Frontend**: React + PatternFly
+          - **Backend**: FastAPI
+          - **AI Platform**: LlamaStack
+          - **Database**: PostgreSQL + pgvector
+
+          ## Features
+
+          - 🤖 Agent management and configuration
+          - 📚 Knowledge bases with RAG {% if parameters.enableKnowledgeBases %}✅{% else %}❌{% endif %}
+          - 💬 Streaming conversations with history
+          - 🔧 MCP server integration {% if parameters.enableMCPServers %}✅{% else %}❌{% endif %}
+          - 🔍 Web search tool {% if parameters.enableWebSearch %}✅{% else %}❌{% endif %}
+          - 🛡️ Safety guardrails {% if parameters.enableSafetyGuardrails %}✅{% else %}❌{% endif %}
+          - 📎 File attachments {% if parameters.enableAttachments %}✅{% else %}❌{% endif %}
+
+          {% if parameters.deploymentMode == 'openshift' %}
+          ## Prerequisites
+
+          - Red Hat OpenShift cluster
+          - Red Hat OpenShift AI installed
+          - Cluster admin access (for OAuth and ClusterRole)
+          - OpenShift CLI (`oc`)
+          - Hugging Face token {% if parameters.huggingfaceToken %}✅{% else %}(optional){% endif %}
+
+          ## Quick Start
+
+          ```bash
+          # Login to OpenShift
+          oc login --token=<token> --server=${{ parameters.openshiftCluster }}
+
+          # Run deployment script
+          chmod +x deploy.sh
+          ./deploy.sh
+          ```
+
+          **OR manually:**
+
+          ```bash
+          cd deploy/cluster
+          make install NAMESPACE=${{ parameters.namespace }}
+          ```
+
+          ## Monitor Deployment
+
+          ```bash
+          oc get pods -n ${{ parameters.namespace }} -w
+          ```
+
+          Expected components:
+          - frontend (React UI)
+          - backend (FastAPI server)
+          - llamastack (AI inference)
+          - postgres (Database)
+          {% if parameters.enableAttachments %}
+          - minio (Object storage)
+          {% endif %}
+
+          ## Access the Platform
+
+          ```bash
+          # Get frontend route
+          oc get route -n ${{ parameters.namespace }}
+          ```
+
+          Navigate to the route URL to access the AI Virtual Agent UI.
+
+          {% else %}
+          ## Local Development Setup
+
+          ```bash
+          cd deploy/local
+          make compose-up
+          ```
+
+          **Access points:**
+          - Frontend: http://localhost:5173
+          - API: http://localhost:8000
+          - API Docs: http://localhost:8000/docs
+
+          **Note**: Local deployment has limited functionality:
+          - ❌ Knowledge bases not supported
+          - ❌ Authentication disabled
+          - ❌ MCP servers not available
+          - ✅ Basic chat functionality works
+
+          For full features, deploy to OpenShift.
+
+          ## Stop Local Environment
+
+          ```bash
+          cd deploy/local
+          make compose-down
+          ```
+          {% endif %}
+
+          ## Architecture
+
+          ```
+          ┌─────────────────────────────────────────┐
+          │   React Frontend (PatternFly)           │
+          │   Agent chat interface                  │
+          └──────────────┬──────────────────────────┘
+                         │
+          ┌──────────────▼──────────────────────────┐
+          │   FastAPI Backend                       │
+          │   - Agent management                    │
+          │   - Session handling                    │
+          │   - Tool orchestration                  │
+          └──────┬───────────┬──────────────────────┘
+                 │           │
+          ┌──────▼──────┐ ┌──▼─────────────────────┐
+          │ LlamaStack  │ │ PostgreSQL + pgvector  │
+          │ AI Platform │ │ Knowledge base storage │
+          └─────────────┘ └────────────────────────┘
+          ```
+
+          ## Configuration
+
+          Edit `.env` file for custom configuration:
+
+          ```bash
+          # Database
+          DATABASE_URL=postgresql+asyncpg://admin:password@postgres:5432/ai_virtual_agent
+
+          # LLM
+          LLM_PROVIDER=${{ parameters.llmProvider }}
+          LLM_MODEL=${{ parameters.llmModel }}
+
+          # Features
+          ENABLE_KNOWLEDGE_BASES=${{ parameters.enableKnowledgeBases }}
+          ENABLE_WEB_SEARCH=${{ parameters.enableWebSearch }}
+          ENABLE_MCP_SERVERS=${{ parameters.enableMCPServers }}
+          ```
+
+          ## Example: Create an Agent
+
+          ```python
+          from ai_virtual_agent import AgentClient
+
+          client = AgentClient(api_url="http://localhost:8000")
+
+          # Create knowledge base
+          kb = client.create_knowledge_base(
+              name="Product Documentation",
+              documents=["./docs/product_manual.pdf"]
+          )
+
+          # Create agent
+          agent = client.create_agent(
+              name="Support Agent",
+              knowledge_bases=[kb.id],
+              tools=["web_search"],
+              safety_level="moderate"
+          )
+
+          # Start conversation
+          session = client.create_session(agent_id=agent.id)
+          response = client.send_message(
+              session_id=session.id,
+              message="How do I reset my password?"
+          )
+
+          print(response.content)
+          ```
+
+          ## Advanced: MCP Server Integration
+
+          Connect enterprise databases (Oracle, MySQL, etc.) using MCP servers:
+
+          ```bash
+          # See docs/mcp-integration.md for detailed guide
+          ```
+
+          ## Cleanup
+
+          {% if parameters.deploymentMode == 'openshift' %}
+          ```bash
+          cd deploy/cluster
+          make uninstall NAMESPACE=${{ parameters.namespace }}
+          ```
+          {% else %}
+          ```bash
+          cd deploy/local
+          make compose-down
+          ```
+          {% endif %}
+
+          ## References
+
+          - [AI Virtual Agent Repository](https://github.com/rh-ai-quickstart/ai-virtual-agent)
+          - [Documentation](https://github.com/rh-ai-quickstart/ai-virtual-agent/tree/main/docs)
+          - [OpenShift AI](https://www.redhat.com/en/technologies/cloud-computing/openshift/openshift-ai)
+          - [LlamaStack](https://github.com/meta-llama/llama-stack)
+          - [Model Context Protocol](https://modelcontextprotocol.io)
+
+    - id: create-catalog-info
+      name: Create Catalog Info
+      action: fetch:template
+      input:
+        targetPath: ./ai-virtual-agent
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          namespace: ${{ parameters.namespace }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+          deploymentMode: ${{ parameters.deploymentMode }}
+        content: |
+          apiVersion: backstage.io/v1alpha1
+          kind: Component
+          metadata:
+            name: ${{ parameters.name }}
+            description: ${{ parameters.description }}
+            annotations:
+              {% if parameters.deploymentMode == 'openshift' %}
+              backstage.io/kubernetes-namespace: ${{ parameters.namespace }}
+              openshift.io/cluster: ${{ parameters.openshiftCluster }}
+              {% endif %}
+              github.com/project-slug: ${{ parameters.repoUrl | parseRepoUrl }}
+              docs.redhat.com/quickstart-type: ai-virtual-agent
+              docs.redhat.com/deployment-mode: ${{ parameters.deploymentMode }}
+            tags:
+              - ai
+              - virtual-agent
+              - llamastack
+              - fastapi
+              - react
+              - mcp
+              - rag
+              - openshift-ai
+              - ${{ parameters.deploymentMode }}
+            links:
+              - url: https://github.com/rh-ai-quickstart/ai-virtual-agent
+                title: AI Virtual Agent Repository
+                icon: github
+              - url: https://github.com/rh-ai-quickstart/ai-virtual-agent/tree/main/docs
+                title: Documentation
+                icon: docs
+          spec:
+            type: service
+            lifecycle: experimental
+            owner: ${{ parameters.owner }}
+            system: ai-platform
+            providesApis:
+              - virtual-agent-api
+            dependsOn:
+              - resource:postgres
+              - resource:llamastack
+              {% if parameters.deploymentMode == 'openshift' %}
+              - resource:openshift-ai
+              {% endif %}
+              {% if parameters.enableAttachments %}
+              - resource:minio
+              {% endif %}
+
+    - id: publish
+      name: Publish to GitHub
+      if: ${{ parameters.createGitRepo }}
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        repoVisibility: private
+        sourcePath: ./ai-virtual-agent
+
+    - id: register
+      name: Register Component
+      if: ${{ parameters.createGitRepo }}
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
+      - title: OpenShift Console
+        url: ${{ parameters.openshiftCluster }}/k8s/cluster/projects/${{ parameters.namespace }}
+        icon: dashboard
+        condition: ${{ parameters.deploymentMode == 'openshift' }}
+      - title: AI Virtual Agent Docs
+        url: https://github.com/rh-ai-quickstart/ai-virtual-agent
+        icon: docs
+    text:
+      - title: Next Steps
+        content: |
+          Your AI Virtual Agent Platform has been configured!
+
+          **Deployment**: ${{ parameters.deploymentMode }}
+          **LLM**: ${{ parameters.llmProvider }}
+          **Features**: Knowledge bases {% if parameters.enableKnowledgeBases %}✅{% else %}❌{% endif %}, Web search {% if parameters.enableWebSearch %}✅{% else %}❌{% endif %}, MCP servers {% if parameters.enableMCPServers %}✅{% else %}❌{% endif %}
+
+          {% if parameters.deploymentMode == 'openshift' %}
+          ## Deploy to OpenShift
+
+          ```bash
+          cd ai-virtual-agent
+          chmod +x deploy.sh
+          ./deploy.sh
+          ```
+
+          OR manually:
+
+          ```bash
+          cd deploy/cluster
+          make install NAMESPACE=${{ parameters.namespace }}
+          ```
+
+          ## Monitor Progress
+
+          ```bash
+          oc get pods -n ${{ parameters.namespace }} -w
+          ```
+
+          ## Access Platform
+
+          ```bash
+          oc get route -n ${{ parameters.namespace }}
+          ```
+
+          **Estimated deployment time**: 10-15 minutes
+
+          {% else %}
+          ## Start Local Development
+
+          ```bash
+          cd ai-virtual-agent/deploy/local
+          make compose-up
+          ```
+
+          Access at:
+          - Frontend: http://localhost:5173
+          - API: http://localhost:8000
+          - API Docs: http://localhost:8000/docs
+
+          **Note**: Local mode has limited functionality. For full features, deploy to OpenShift.
+
+          {% endif %}
+
+          ## Documentation
+
+          - [AI Virtual Agent Docs](https://github.com/rh-ai-quickstart/ai-virtual-agent/tree/main/docs)
+          - [MCP Integration Guide](https://github.com/rh-ai-quickstart/ai-virtual-agent/blob/main/docs/mcp-integration.md)
+          - [Development Setup](https://github.com/rh-ai-quickstart/ai-virtual-agent/blob/main/DEVELOPMENT.md)
