@@ -1,37 +1,72 @@
 # Example parameter values for Enterprise RAG Chatbot template
+# Based on rh-ai-quickstart/RAG repository
 # Use these as a reference when filling out the template form
 
 name: "company-knowledge-bot"
 owner: "ai-team"
-description: "Enterprise knowledge base chatbot with RAG"
+description: "Enterprise RAG chatbot based on rh-ai-quickstart/RAG"
 
-# Deployment
+# Deployment Mode
+deploymentMode: "openshift"  # Options: local, openshift
 openshiftCluster: "https://api.prod-cluster.example.com:6443"
 namespace: "rag-chatbot"
 
-# Vector Database
-vectorDB: "milvus"  # Options: milvus, pgvector, redis, qdrant
-vectorDBSize: "100Gi"
-
 # LLM Configuration
-llmProvider: "openshift-ai"  # or "external-api"
-llmModel: "Llama 3.1 70B"
-llmEndpoint: "https://llm-serving.openshift-ai.svc:8080/v1"
-llmApiKey: "internal-service-key"
+llmModel: "meta-llama/Llama-3.2-3B-Instruct"  # Options: Llama-3.2-3B, Llama-3.1-8B, Llama-3.1-70B
+embeddingModel: "all-MiniLM-L6-v2"  # Default from rh-ai-quickstart/RAG
+enableLlamaGuard: true
 
-# Embedding Model
-embeddingModel: "BAAI/BGE-large-en-v1.5"
+# Hardware (OpenShift only)
+accelerator: "nvidia-gpu"  # Options: cpu, nvidia-gpu, intel-gaudi
+vramSize: "24GB"
+
+# Vector Database (PGVector - PostgreSQL)
+pgvectorStorageSize: "100Gi"
+pgvectorMemory: "4Gi"
+
+# Document Ingestion
+dataSources:
+  - "github"
+  - "url"
+
+# GitHub data source
+githubRepos: "redhat-developer/redhat-helm-charts,openshift/documentation"
+githubToken: "ghp_yourGitHubTokenHere"  # Use secret management!
+
+# URL data source
+documentUrls: "https://docs.redhat.com/example.pdf,https://example.com/policy.pdf"
+
+# S3/MinIO data source (optional)
+# s3Endpoint: "https://minio.example.com"
+# s3Bucket: "company-docs"
+# s3AccessKey: "minioadmin"
+# s3SecretKey: "minioadmin"
+
+# Auto-ingestion
+enableAutoIngestion: true
+ingestionSchedule: "0 3 * * *"  # Daily at 3 AM
+
+# UI Configuration
+enableStreamlit: true
+uiPort: 8501
+
+# Advanced
+enableKubeflowPipelines: false
 chunkSize: 1000
 chunkOverlap: 200
-
-# Data Sources
-dataSources:
-  - "confluence"
-  - "sharepoint"
-  - "local-files"
-enableAutoSync: true
-syncSchedule: "0 3 * * *"  # Daily at 3 AM
 
 # Repository
 createGitRepo: true
 repoUrl: "github.com/your-org/company-knowledge-bot"
+
+# ---
+# For LOCAL deployment (Podman/Docker with Ollama):
+#
+# deploymentMode: "local"
+# llmModel: "meta-llama/Llama-3.2-3B-Instruct"
+# embeddingModel: "all-MiniLM-L6-v2"
+# dataSources: ["url"]
+# documentUrls: "https://example.com/doc.pdf"
+#
+# Then run: cd deploy/local && make start
+# Access at: http://localhost:8501
