@@ -2,11 +2,13 @@
 
 This repository contains Backstage/Red Hat Developer Hub templates for deploying Red Hat AI Quickstarts. These templates enable teams to quickly scaffold and deploy AI-powered applications on Red Hat OpenShift AI.  
 
-** Please ensure that you validate and update these template for your enterprise use.  These are example templates and should not be used in production ***
+
 
 ## Overview
 
 Red Hat AI Quickstarts are ready-to-run, industry-specific use cases designed to demonstrate how Red Hat AI products can power real-world solutions on enterprise-ready, open source infrastructure.
+
+** Please ensure that you validate and update these template for your enterprise use.  These are example templates and should not be used in production ***
 
 ## Available Templates
 
