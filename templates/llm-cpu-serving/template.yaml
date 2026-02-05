@@ -2,15 +2,17 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: redhat-ai-llm-cpu-serving
-  title: LLM CPU Serving
-  description: Deploy a lightweight AI assistant serving small language models on CPU
+  title: LLM CPU Serving - HR Assistant
+  description: Deploy an AI-powered HR Assistant using vLLM on CPU (no GPU required) based on rh-ai-quickstart/llm-cpu-serving
   tags:
     - redhat
     - ai
+    - openshift-ai
     - llm
     - cpu-serving
-    - openshift
-    - lightweight
+    - vllm
+    - anythingllm
+    - hr-assistant
 spec:
   owner: platform-team
   type: service
@@ -24,9 +26,10 @@ spec:
         name:
           title: Project Name
           type: string
-          description: Name for your LLM CPU serving instance
+          description: Name for your HR Assistant instance
           ui:autofocus: true
           ui:field: EntityNamePicker
+          default: hr-assistant
         owner:
           title: Owner
           type: string
@@ -38,10 +41,10 @@ spec:
         description:
           title: Description
           type: string
-          description: Purpose of this LLM service
-          default: Lightweight CPU-based LLM serving for AI assistance
+          description: Purpose of this HR Assistant deployment
+          default: AI-powered HR Assistant on CPU using TinyLlama
 
-    - title: Deployment Configuration
+    - title: OpenShift Configuration
       required:
         - openshiftCluster
         - namespace
@@ -51,141 +54,109 @@ spec:
           type: string
           description: Target OpenShift cluster URL
           default: https://api.cluster.example.com:6443
+          ui:help: Requires OpenShift 4.16.24+
         namespace:
-          title: Namespace
+          title: Namespace/Project
           type: string
-          description: OpenShift namespace for deployment
-          default: llm-serving
+          description: OpenShift project for deployment
+          default: hr-assistant
+        openshiftAIVersion:
+          title: OpenShift AI Version
+          type: string
+          description: OpenShift AI version
+          default: 2.16.2+
+          enum:
+            - 2.16.2+
+            - 2.17+
+          ui:help: Requires OpenShift AI 2.16.2 or later
 
     - title: Model Configuration
-      required:
-        - modelSize
       properties:
-        modelSize:
-          title: Model Size
+        llmModel:
+          title: LLM Model
           type: string
-          description: Choose model size based on CPU resources
-          default: small-1b
+          description: Language model for serving
+          default: TinyLlama-1.1B-Chat-v1.0
           enum:
-            - small-1b
-            - medium-3b
-            - large-7b
+            - TinyLlama-1.1B-Chat-v1.0
           enumNames:
-            - Small (1B - 2 CPU cores, 4GB RAM)
-            - Medium (3B - 4 CPU cores, 8GB RAM)
-            - Large (7B - 8 CPU cores, 16GB RAM)
-        modelSource:
-          title: Model Source
+            - TinyLlama 1.1B (Default - CPU optimized)
+          ui:help: Currently only TinyLlama is supported for CPU serving
+        vllmImage:
+          title: vLLM Container Image
           type: string
-          description: Source for the language model
-          default: huggingface
-          enum:
-            - huggingface
-            - custom
-          enumNames:
-            - HuggingFace Hub
-            - Custom Model Path
-        huggingfaceModel:
-          title: HuggingFace Model
-          type: string
-          description: HuggingFace model identifier
-          default: TinyLlama/TinyLlama-1.1B-Chat-v1.0
-          ui:hidden:
-            modelSource: custom
-        customModelPath:
-          title: Custom Model Path
-          type: string
-          description: S3 or local path to custom model
-          ui:hidden:
-            modelSource: huggingface
-        quantization:
-          title: Model Quantization
-          type: string
-          description: Quantization method for better CPU performance
-          default: int8
-          enum:
-            - none
-            - int8
-            - int4
-          enumNames:
-            - None (Full precision)
-            - INT8 (2x faster, minimal quality loss)
-            - INT4 (4x faster, some quality loss)
+          description: vLLM CPU runtime container image
+          default: quay.io/rh-aiservices-bu/vllm-cpu-openai-ubi9:latest
+          ui:help: Pre-built vLLM CPU image from Red Hat AI Services
 
-    - title: Serving Configuration
-      properties:
-        maxConcurrentRequests:
-          title: Max Concurrent Requests
-          type: number
-          description: Maximum number of concurrent requests
-          default: 4
-        maxTokens:
-          title: Max Tokens per Request
-          type: number
-          description: Maximum tokens in model response
-          default: 512
-        temperature:
-          title: Default Temperature
-          type: number
-          description: Sampling temperature (0.0 - 2.0)
-          default: 0.7
-          minimum: 0
-          maximum: 2
-        enableCaching:
-          title: Enable Response Caching
-          type: boolean
-          description: Cache responses for identical requests
-          default: true
-
-    - title: Resource Limits
+    - title: Resource Configuration
       properties:
         cpuRequest:
           title: CPU Request
           type: string
           description: Requested CPU cores
           default: "2"
-        cpuLimit:
-          title: CPU Limit
-          type: string
-          description: Maximum CPU cores
-          default: "4"
+          enum:
+            - "2"
+            - "4"
+            - "8"
+          enumNames:
+            - 2 cores (Minimum)
+            - 4 cores (Recommended)
+            - 8 cores (Optimal)
         memoryRequest:
           title: Memory Request
           type: string
           description: Requested memory
           default: 4Gi
-        memoryLimit:
-          title: Memory Limit
+          enum:
+            - 4Gi
+            - 8Gi
+          enumNames:
+            - 4 GB (Minimum)
+            - 8 GB (Recommended)
+        cpuArchitecture:
+          title: CPU Architecture
           type: string
-          description: Maximum memory
-          default: 8Gi
+          description: Preferred CPU architecture
+          default: x86_64
+          enum:
+            - x86_64
+            - x86_64-avx512
+          enumNames:
+            - Standard x86_64
+            - Intel with AVX-512 (Recommended for compressed models)
 
-    - title: API Configuration
+    - title: AnythingLLM Configuration
       properties:
-        enableAuth:
-          title: Enable API Authentication
+        enableAnythingLLM:
+          title: Deploy AnythingLLM Workbench
           type: boolean
-          description: Require API key for requests
+          description: Deploy AnythingLLM chat interface
           default: true
-        apiKeys:
-          title: API Keys
+          ui:help: Provides the chat UI for HR assistant
+        anythingLLMWorkspace:
+          title: Workspace Name
           type: string
-          description: Comma-separated list of API keys
-          ui:widget: password
+          description: AnythingLLM workspace name
+          default: Assistant to the HR Representative
           ui:hidden:
-            enableAuth: false
-        enableRateLimit:
-          title: Enable Rate Limiting
+            enableAnythingLLM: false
+
+    - title: Prerequisites Check
+      properties:
+        hasServiceMesh:
+          title: OpenShift Service Mesh Installed
           type: boolean
-          description: Limit requests per client
-          default: true
-        rateLimit:
-          title: Rate Limit
-          type: string
-          description: Requests per minute per client
-          default: "60"
-          ui:hidden:
-            enableRateLimit: false
+          description: Confirm OpenShift Service Mesh is installed
+          default: false
+          ui:help: Required for deployment
+        hasServerless:
+          title: OpenShift Serverless Installed
+          type: boolean
+          description: Confirm OpenShift Serverless is installed
+          default: false
+          ui:help: Required for deployment
 
     - title: Repository Configuration
       properties:
@@ -206,146 +177,211 @@ spec:
 
   steps:
     - id: fetch-base
-      name: Fetch LLM CPU Serving
+      name: Fetch LLM CPU Serving Quickstart
       action: fetch:plain
       input:
         url: https://github.com/rh-ai-quickstart/llm-cpu-serving
-        targetPath: ./llm-serving
+        targetPath: ./llm-cpu-serving
 
-    - id: create-deployment
-      name: Generate Deployment Manifest
+    - id: create-helm-values
+      name: Generate Helm Values
       action: fetch:template
       input:
-        targetPath: ./llm-serving/manifests
+        targetPath: ./llm-cpu-serving
         values:
-          name: ${{ parameters.name }}
           namespace: ${{ parameters.namespace }}
-          modelSize: ${{ parameters.modelSize }}
-          huggingfaceModel: ${{ parameters.huggingfaceModel }}
-          quantization: ${{ parameters.quantization }}
+          projectName: ${{ parameters.name }}
+          llmModel: ${{ parameters.llmModel }}
+          vllmImage: ${{ parameters.vllmImage }}
           cpuRequest: ${{ parameters.cpuRequest }}
-          cpuLimit: ${{ parameters.cpuLimit }}
           memoryRequest: ${{ parameters.memoryRequest }}
-          memoryLimit: ${{ parameters.memoryLimit }}
-          maxConcurrentRequests: ${{ parameters.maxConcurrentRequests }}
-          maxTokens: ${{ parameters.maxTokens }}
-          temperature: ${{ parameters.temperature }}
+          enableAnythingLLM: ${{ parameters.enableAnythingLLM }}
+          workspaceName: ${{ parameters.anythingLLMWorkspace }}
         content: |
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: ${{ parameters.name }}
-            namespace: ${{ parameters.namespace }}
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
-                app: ${{ parameters.name }}
-            template:
-              metadata:
-                labels:
-                  app: ${{ parameters.name }}
-              spec:
-                containers:
-                  - name: llm-server
-                    image: quay.io/redhat-ai/llm-cpu-serving:latest
-                    env:
-                      - name: MODEL_ID
-                        value: ${{ parameters.huggingfaceModel }}
-                      - name: QUANTIZATION
-                        value: ${{ parameters.quantization }}
-                      - name: MAX_CONCURRENT_REQUESTS
-                        value: "${{ parameters.maxConcurrentRequests }}"
-                      - name: MAX_TOKENS
-                        value: "${{ parameters.maxTokens }}"
-                      - name: TEMPERATURE
-                        value: "${{ parameters.temperature }}"
-                      {% if parameters.enableCaching %}
-                      - name: ENABLE_CACHE
-                        value: "true"
-                      {% endif %}
-                    resources:
-                      requests:
-                        cpu: ${{ parameters.cpuRequest }}
-                        memory: ${{ parameters.memoryRequest }}
-                      limits:
-                        cpu: ${{ parameters.cpuLimit }}
-                        memory: ${{ parameters.memoryLimit }}
-                    ports:
-                      - containerPort: 8080
-                        name: http
+          # Custom values for ${{ parameters.name }}
+          # Based on rh-ai-quickstart/llm-cpu-serving
 
-    - id: create-service
-      name: Generate Service Manifest
+          namespace: ${{ parameters.namespace }}
+          projectName: ${{ parameters.name }}
+
+          vllm:
+            image: ${{ parameters.vllmImage }}
+            model: ${{ parameters.llmModel }}
+            resources:
+              requests:
+                cpu: ${{ parameters.cpuRequest }}
+                memory: ${{ parameters.memoryRequest }}
+              limits:
+                cpu: "{{ parameters.cpuRequest * 2 }}"
+                memory: "{{ parameters.memoryRequest * 2 }}"
+
+          anythingllm:
+            enabled: ${{ parameters.enableAnythingLLM }}
+            workspace: "${{ parameters.anythingLLMWorkspace }}"
+
+    - id: create-deployment-script
+      name: Create Deployment Script
       action: fetch:template
       input:
-        targetPath: ./llm-serving/manifests
+        targetPath: ./llm-cpu-serving
+        values:
+          namespace: ${{ parameters.namespace }}
+          projectName: ${{ parameters.name }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+        content: |
+          #!/bin/bash
+          # Deployment script for ${{ parameters.name }}
+
+          set -e
+
+          PROJECT="${{ parameters.name }}"
+          NAMESPACE="${{ parameters.namespace }}"
+
+          echo "🚀 Deploying HR Assistant: ${PROJECT}"
+
+          # Create OpenShift project
+          echo "📦 Creating project ${NAMESPACE}..."
+          oc new-project ${NAMESPACE} || echo "Project already exists"
+
+          # Install via Helm
+          echo "⚙️  Installing Helm chart..."
+          helm install ${PROJECT} helm/ --namespace ${NAMESPACE} -f values.yaml
+
+          # Monitor deployment
+          echo "👀 Monitoring pod status..."
+          oc -n ${NAMESPACE} get pods -w
+
+          echo "✅ Deployment complete!"
+          echo ""
+          echo "Expected pods:"
+          echo "  - anythingllm"
+          echo "  - anythingllm-seed"
+          echo "  - tinyllama-1b-cpu-predictor"
+          echo ""
+          echo "Access your HR Assistant via OpenShift AI Dashboard"
+
+    - id: create-readme
+      name: Create Deployment README
+      action: fetch:template
+      input:
+        targetPath: ./llm-cpu-serving
         values:
           name: ${{ parameters.name }}
           namespace: ${{ parameters.namespace }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+          cpuRequest: ${{ parameters.cpuRequest }}
+          memoryRequest: ${{ parameters.memoryRequest }}
         content: |
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: ${{ parameters.name }}
-            namespace: ${{ parameters.namespace }}
-          spec:
-            selector:
-              app: ${{ parameters.name }}
-            ports:
-              - protocol: TCP
-                port: 8080
-                targetPort: 8080
-            type: ClusterIP
+          # ${{ parameters.name }} - HR Assistant (LLM CPU Serving)
 
-    - id: create-route
-      name: Generate Route Manifest
-      action: fetch:template
-      input:
-        targetPath: ./llm-serving/manifests
-        values:
-          name: ${{ parameters.name }}
-          namespace: ${{ parameters.namespace }}
-        content: |
-          apiVersion: route.openshift.io/v1
-          kind: Route
-          metadata:
-            name: ${{ parameters.name }}
-            namespace: ${{ parameters.namespace }}
-          spec:
-            to:
-              kind: Service
-              name: ${{ parameters.name }}
-            port:
-              targetPort: 8080
-            tls:
-              termination: edge
-              insecureEdgeTerminationPolicy: Redirect
+          AI-powered HR Assistant running on CPU infrastructure (no GPU required).
 
-    - id: create-secrets
-      name: Generate Secrets
-      if: ${{ parameters.enableAuth }}
-      action: fetch:template
-      input:
-        targetPath: ./llm-serving/manifests
-        values:
-          namespace: ${{ parameters.namespace }}
-          apiKeys: ${{ parameters.apiKeys }}
-        content: |
-          apiVersion: v1
-          kind: Secret
-          metadata:
-            name: api-credentials
-            namespace: ${{ parameters.namespace }}
-          type: Opaque
-          stringData:
-            api-keys: ${{ parameters.apiKeys }}
+          ## Overview
+
+          - **Model**: TinyLlama 1.1B
+          - **Runtime**: vLLM CPU
+          - **UI**: AnythingLLM Workbench
+          - **Resources**: ${{ parameters.cpuRequest }} CPU, ${{ parameters.memoryRequest }} Memory
+
+          ## Quick Start
+
+          ### Prerequisites
+
+          Ensure you have the following installed on OpenShift:
+          - ✅ OpenShift 4.16.24+
+          - ✅ OpenShift AI 2.16.2+
+          - ✅ OpenShift Service Mesh
+          - ✅ OpenShift Serverless
+
+          ### Deployment
+
+          ```bash
+          # Login to OpenShift
+          oc login --token=<token> --server=${{ parameters.openshiftCluster }}
+
+          # Run deployment script
+          chmod +x deploy.sh
+          ./deploy.sh
+          ```
+
+          **OR manually:**
+
+          ```bash
+          # Create project
+          oc new-project ${{ parameters.namespace }}
+
+          # Install via Helm
+          helm install ${{ parameters.name }} helm/ \
+            --namespace ${{ parameters.namespace }} \
+            -f values.yaml
+
+          # Monitor pods
+          oc -n ${{ parameters.namespace }} get pods -w
+          ```
+
+          ### Expected Pods
+
+          Wait for these pods to be Running:
+          - `anythingllm` - Chat interface workbench
+          - `anythingllm-seed` - Initial workspace setup
+          - `tinyllama-1b-cpu-predictor` - vLLM inference server
+
+          ### Access the HR Assistant
+
+          1. Navigate to OpenShift AI Dashboard
+          2. Go to your project: `${{ parameters.namespace }}`
+          3. Open the AnythingLLM workbench
+          4. Start chatting with the HR Assistant!
+
+          ## Use Case
+
+          The HR Assistant helps HR representatives by:
+          - Answering policy questions
+          - Providing guidance on procedures
+          - Citing relevant documentation
+          - Supporting decision-making
+
+          ## Architecture
+
+          ```
+          ┌─────────────────────────────────────┐
+          │   AnythingLLM Workbench (UI)        │
+          │   Chat interface for HR queries     │
+          └──────────────┬──────────────────────┘
+                         │
+          ┌──────────────▼──────────────────────┐
+          │   vLLM CPU Runtime                  │
+          │   TinyLlama 1.1B Inference          │
+          │   OpenAI-compatible API             │
+          └─────────────────────────────────────┘
+          ```
+
+          ## Cleanup
+
+          ```bash
+          helm uninstall ${{ parameters.name }} --namespace ${{ parameters.namespace }}
+          oc delete project ${{ parameters.namespace }}
+          ```
+
+          ## Technical Details
+
+          - **Container Image**: quay.io/rh-aiservices-bu/vllm-cpu-openai-ubi9
+          - **Model Size**: 1.1B parameters
+          - **Storage**: ~5 GB
+          - **CPU Optimization**: Built with vLLM CPU support
+          - **Recommended CPU**: Intel with AVX-512 for best performance
+
+          ## References
+
+          - [rh-ai-quickstart/llm-cpu-serving](https://github.com/rh-ai-quickstart/llm-cpu-serving)
+          - [vLLM CPU Documentation](https://docs.vllm.ai/en/latest/getting_started/cpu-installation.html)
+          - [llm-on-openshift](https://github.com/rh-aiservices-bu/llm-on-openshift)
 
     - id: create-catalog-info
       name: Create Catalog Info
       action: fetch:template
       input:
-        targetPath: ./llm-serving
+        targetPath: ./llm-cpu-serving
         values:
           name: ${{ parameters.name }}
           description: ${{ parameters.description }}
@@ -367,18 +403,26 @@ spec:
               - ai
               - llm
               - cpu-serving
-              - lightweight
+              - vllm
+              - anythingllm
+              - hr-assistant
+              - openshift-ai
             links:
-              - url: https://docs.redhat.com/en/learn/ai-quickstarts
-                title: LLM CPU Serving Documentation
-                icon: docs
+              - url: https://github.com/rh-ai-quickstart/llm-cpu-serving
+                title: LLM CPU Serving Repository
+                icon: github
+              - url: https://github.com/rh-aiservices-bu/llm-on-openshift
+                title: LLM on OpenShift
+                icon: github
           spec:
             type: service
             lifecycle: production
             owner: ${{ parameters.owner }}
             system: ai-platform
-            providesApis:
-              - llm-inference-api
+            dependsOn:
+              - resource:openshift-ai
+              - resource:service-mesh
+              - resource:serverless
 
     - id: publish
       name: Publish to GitHub
@@ -390,7 +434,7 @@ spec:
         repoUrl: ${{ parameters.repoUrl }}
         defaultBranch: main
         repoVisibility: private
-        sourcePath: ./llm-serving
+        sourcePath: ./llm-cpu-serving
 
     - id: register
       name: Register Component
@@ -411,21 +455,47 @@ spec:
       - title: OpenShift Console
         url: ${{ parameters.openshiftCluster }}/k8s/cluster/projects/${{ parameters.namespace }}
         icon: dashboard
+      - title: LLM CPU Serving Docs
+        url: https://github.com/rh-ai-quickstart/llm-cpu-serving
+        icon: docs
     text:
       - title: Next Steps
         content: |
-          Your LLM CPU Serving instance has been configured!
+          Your HR Assistant has been configured!
 
-          Model: ${{ parameters.huggingfaceModel }}
-          Size: ${{ parameters.modelSize }}
-          Quantization: ${{ parameters.quantization }}
-          Resources: ${{ parameters.cpuRequest }} CPU, ${{ parameters.memoryRequest }} Memory
+          **Model**: TinyLlama 1.1B
+          **Runtime**: vLLM CPU
+          **Resources**: ${{ parameters.cpuRequest }} CPU, ${{ parameters.memoryRequest }} Memory
 
-          Next steps:
-          1. Deploy to OpenShift: kubectl apply -k manifests/
-          2. Wait for pod to be ready (model download may take a few minutes)
-          3. Get the route URL: oc get route ${{ parameters.name }} -n ${{ parameters.namespace }}
-          4. Test the API endpoint
-          5. Integrate with your applications
+          ## Prerequisites Check
 
-          API Endpoint: https://<route-url>/v1/completions
+          Before deploying, ensure:
+          - [ ] OpenShift 4.16.24+ is running
+          - [ ] OpenShift AI 2.16.2+ is installed
+          - [ ] Service Mesh: ${{ parameters.hasServiceMesh ? '✅ Confirmed' : '❌ Not confirmed' }}
+          - [ ] Serverless: ${{ parameters.hasServerless ? '✅ Confirmed' : '❌ Not confirmed' }}
+
+          ## Deploy Now
+
+          ```bash
+          cd ${{ parameters.name }}
+          chmod +x deploy.sh
+          ./deploy.sh
+          ```
+
+          ## Monitor Progress
+
+          ```bash
+          oc -n ${{ parameters.namespace }} get pods -w
+          ```
+
+          Expected pods:
+          - anythingllm
+          - anythingllm-seed
+          - tinyllama-1b-cpu-predictor
+
+          ## Access Your HR Assistant
+
+          Navigate to OpenShift AI Dashboard → ${{ parameters.namespace }} → AnythingLLM Workbench
+
+          **Estimated deployment time**: 5-10 minutes

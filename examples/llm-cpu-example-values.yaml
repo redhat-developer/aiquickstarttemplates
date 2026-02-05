@@ -1,38 +1,43 @@
-# Example parameter values for LLM CPU Serving template
+# Example parameter values for LLM CPU Serving - HR Assistant template
+# Based on rh-ai-quickstart/llm-cpu-serving repository
 # Use these as a reference when filling out the template form
 
-name: "dev-llm-service"
-owner: "developer-tools"
-description: "Lightweight LLM for development team"
+name: "hr-assistant"
+owner: "hr-team"
+description: "AI-powered HR Assistant on CPU using TinyLlama"
 
-# Deployment
-openshiftCluster: "https://api.dev-cluster.example.com:6443"
-namespace: "llm-serving"
+# OpenShift Configuration
+openshiftCluster: "https://api.prod-cluster.example.com:6443"
+namespace: "hr-assistant"
+openshiftAIVersion: "2.16.2+"
 
 # Model Configuration
-modelSize: "small-1b"  # Options: small-1b, medium-3b, large-7b
-modelSource: "huggingface"
-huggingfaceModel: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-quantization: "int8"  # Options: none, int8, int4
+llmModel: "TinyLlama-1.1B-Chat-v1.0"  # Only supported model for CPU serving
+vllmImage: "quay.io/rh-aiservices-bu/vllm-cpu-openshift-ubi9:latest"
 
-# Serving Configuration
-maxConcurrentRequests: 4
-maxTokens: 512
-temperature: 0.7
-enableCaching: true
+# Resource Configuration
+cpuRequest: "4"  # Options: "2" (min), "4" (recommended), "8" (optimal)
+memoryRequest: "8Gi"  # Options: "4Gi" (min), "8Gi" (recommended)
+cpuArchitecture: "x86_64-avx512"  # Use AVX-512 for best performance
 
-# Resource Limits
-cpuRequest: "2"
-cpuLimit: "4"
-memoryRequest: "4Gi"
-memoryLimit: "8Gi"
+# AnythingLLM Configuration
+enableAnythingLLM: true
+anythingLLMWorkspace: "Assistant to the HR Representative"
 
-# API Configuration
-enableAuth: true
-apiKeys: "key1,key2,key3"  # Comma-separated
-enableRateLimit: true
-rateLimit: "60"  # Requests per minute
+# Prerequisites Check (REQUIRED!)
+hasServiceMesh: true  # OpenShift Service Mesh must be installed
+hasServerless: true   # OpenShift Serverless must be installed
 
 # Repository
 createGitRepo: true
-repoUrl: "github.com/your-org/dev-llm-service"
+repoUrl: "github.com/your-org/hr-assistant"
+
+# ---
+# Deployment will create these pods:
+# - anythingllm (Chat UI workbench)
+# - anythingllm-seed (Workspace setup)
+# - tinyllama-1b-cpu-predictor (vLLM inference server)
+#
+# Access via OpenShift AI Dashboard → hr-assistant project → AnythingLLM workbench
+#
+# Estimated deployment time: 5-10 minutes
