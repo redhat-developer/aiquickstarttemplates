@@ -1,0 +1,378 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: redhat-ai-product-recommender
+  title: AI Product Recommender System
+  description: Deploy an AI-driven product recommendation system with semantic search and review summarization
+  tags:
+    - redhat
+    - ai
+    - openshift-ai
+    - recommender-system
+    - machine-learning
+    - llama
+    - feast
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Project Information
+      required:
+        - name
+        - owner
+      properties:
+        name:
+          title: Project Name
+          type: string
+          description: Name for your product recommender instance
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+        owner:
+          title: Owner
+          type: string
+          description: Team or individual owning this component
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+        description:
+          title: Description
+          type: string
+          description: Purpose of this recommender system
+          default: AI-powered product recommendation and semantic search system
+
+    - title: OpenShift AI Configuration
+      required:
+        - openshiftCluster
+        - namespace
+      properties:
+        openshiftCluster:
+          title: OpenShift Cluster
+          type: string
+          description: Target OpenShift cluster URL
+          default: https://api.cluster.example.com:6443
+        namespace:
+          title: Namespace
+          type: string
+          description: OpenShift namespace for deployment
+          default: product-recommender
+        openshiftAIVersion:
+          title: OpenShift AI Version
+          type: string
+          description: Version of OpenShift AI to use
+          default: latest
+          enum:
+            - latest
+            - 2.15
+            - 2.14
+
+    - title: ML Models Configuration
+      properties:
+        textEmbeddingModel:
+          title: Text Embedding Model
+          type: string
+          description: Model for text embeddings
+          default: BAAI/BGE-small-en-v1.5
+          enum:
+            - BAAI/BGE-small-en-v1.5
+            - sentence-transformers/all-MiniLM-L6-v2
+        imageEmbeddingModel:
+          title: Image Embedding Model
+          type: string
+          description: Model for image embeddings
+          default: OpenAI/CLIP-vit-base-patch32
+          enum:
+            - OpenAI/CLIP-vit-base-patch32
+            - OpenAI/CLIP-vit-large-patch14
+        llmModel:
+          title: LLM for Summaries
+          type: string
+          description: Large Language Model for generating review summaries
+          default: Llama 3.1 8B
+          enum:
+            - Llama 3.1 8B
+            - Llama 3.1 70B
+            - Mistral 7B
+        llmEndpoint:
+          title: LLM Endpoint
+          type: string
+          description: URL for LLM inference endpoint
+        llmApiKey:
+          title: LLM API Key
+          type: string
+          description: API key for LLM authentication
+          ui:widget: password
+
+    - title: Storage Configuration
+      required:
+        - s3Endpoint
+        - s3Bucket
+      properties:
+        s3Endpoint:
+          title: S3 Endpoint
+          type: string
+          description: S3-compatible storage endpoint for models and features
+          default: https://s3.amazonaws.com
+        s3Bucket:
+          title: S3 Bucket
+          type: string
+          description: S3 bucket name for model artifacts
+        s3AccessKey:
+          title: S3 Access Key
+          type: string
+          description: Access key for S3 storage
+        s3SecretKey:
+          title: S3 Secret Key
+          type: string
+          description: Secret key for S3 storage
+          ui:widget: password
+
+    - title: Feature Store (Feast)
+      properties:
+        enableFeast:
+          title: Enable Feast Feature Store
+          type: boolean
+          description: Deploy Feast for feature management
+          default: true
+        feastRegistry:
+          title: Feast Registry
+          type: string
+          description: Feast registry location
+          default: s3://feast-registry
+          ui:hidden:
+            enableFeast: false
+
+    - title: Pipeline Configuration
+      properties:
+        enablePipelines:
+          title: Enable ML Pipelines
+          type: boolean
+          description: Deploy KFP/Argo Workflows for model training
+          default: true
+        pipelineSchedule:
+          title: Pipeline Schedule
+          type: string
+          description: Cron schedule for model retraining
+          default: "0 2 * * 0"
+          ui:help: Weekly on Sunday at 2 AM (UTC)
+          ui:hidden:
+            enablePipelines: false
+
+    - title: Repository Configuration
+      properties:
+        createGitRepo:
+          title: Create New Git Repository
+          type: boolean
+          description: Publish to a new GitHub repository
+          default: true
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+          ui:hidden:
+            createGitRepo: false
+
+  steps:
+    - id: fetch-base
+      name: Fetch Product Recommender
+      action: fetch:plain
+      input:
+        url: https://github.com/rh-ai-quickstart/product-recommender
+        targetPath: ./recommender
+
+    - id: create-kustomization
+      name: Generate Kustomization
+      action: fetch:template
+      input:
+        targetPath: ./recommender/overlays/${{ parameters.name }}
+        values:
+          name: ${{ parameters.name }}
+          namespace: ${{ parameters.namespace }}
+          textEmbeddingModel: ${{ parameters.textEmbeddingModel }}
+          imageEmbeddingModel: ${{ parameters.imageEmbeddingModel }}
+          llmModel: ${{ parameters.llmModel }}
+          enableFeast: ${{ parameters.enableFeast }}
+          enablePipelines: ${{ parameters.enablePipelines }}
+        content: |
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          namespace: ${{ parameters.namespace }}
+
+          resources:
+            - ../../base
+            {% if parameters.enableFeast %}
+            - ../../base/feast
+            {% endif %}
+            {% if parameters.enablePipelines %}
+            - ../../base/pipelines
+            {% endif %}
+
+          configMapGenerator:
+            - name: model-config
+              literals:
+                - TEXT_EMBEDDING_MODEL=${{ parameters.textEmbeddingModel }}
+                - IMAGE_EMBEDDING_MODEL=${{ parameters.imageEmbeddingModel }}
+                - LLM_MODEL=${{ parameters.llmModel }}
+                - S3_ENDPOINT=${{ parameters.s3Endpoint }}
+                - S3_BUCKET=${{ parameters.s3Bucket }}
+                - FEAST_REGISTRY=${{ parameters.feastRegistry }}
+
+    - id: create-secrets
+      name: Generate Secrets
+      action: fetch:template
+      input:
+        targetPath: ./recommender/overlays/${{ parameters.name }}
+        values:
+          namespace: ${{ parameters.namespace }}
+          llmEndpoint: ${{ parameters.llmEndpoint }}
+          llmApiKey: ${{ parameters.llmApiKey }}
+          s3AccessKey: ${{ parameters.s3AccessKey }}
+          s3SecretKey: ${{ parameters.s3SecretKey }}
+        content: |
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: recommender-credentials
+            namespace: ${{ parameters.namespace }}
+          type: Opaque
+          stringData:
+            llm-endpoint: ${{ parameters.llmEndpoint }}
+            llm-api-key: ${{ parameters.llmApiKey }}
+            s3-access-key: ${{ parameters.s3AccessKey }}
+            s3-secret-key: ${{ parameters.s3SecretKey }}
+
+    - id: create-servingruntime
+      name: Create Model Serving Runtime
+      action: fetch:template
+      input:
+        targetPath: ./recommender/overlays/${{ parameters.name }}
+        values:
+          namespace: ${{ parameters.namespace }}
+          llmModel: ${{ parameters.llmModel }}
+        content: |
+          apiVersion: serving.kserve.io/v1alpha1
+          kind: ServingRuntime
+          metadata:
+            name: llm-runtime
+            namespace: ${{ parameters.namespace }}
+          spec:
+            supportedModelFormats:
+              - name: pytorch
+                version: "2"
+            containers:
+              - name: kserve-container
+                image: quay.io/modh/vllm:latest
+                args:
+                  - --model=${{ parameters.llmModel }}
+                  - --dtype=auto
+                  - --max-model-len=4096
+                env:
+                  - name: HF_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: recommender-credentials
+                        key: llm-api-key
+
+    - id: create-catalog-info
+      name: Create Catalog Info
+      action: fetch:template
+      input:
+        targetPath: ./recommender
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          namespace: ${{ parameters.namespace }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+        content: |
+          apiVersion: backstage.io/v1alpha1
+          kind: Component
+          metadata:
+            name: ${{ parameters.name }}
+            description: ${{ parameters.description }}
+            annotations:
+              backstage.io/kubernetes-namespace: ${{ parameters.namespace }}
+              openshift.io/cluster: ${{ parameters.openshiftCluster }}
+              github.com/project-slug: ${{ parameters.repoUrl | parseRepoUrl }}
+              docs.redhat.com/quickstart-type: product-recommender
+            tags:
+              - ai
+              - openshift-ai
+              - recommender-system
+              - machine-learning
+              - feast
+              - kserve
+            links:
+              - url: https://developers.redhat.com/articles/2026/01/20/ai-quickstart-product-recommender-openshift-ai
+                title: Quickstart Documentation
+                icon: docs
+          spec:
+            type: service
+            lifecycle: experimental
+            owner: ${{ parameters.owner }}
+            system: ai-platform
+            providesApis:
+              - product-recommendations-api
+            dependsOn:
+              - resource:openshift-ai
+              - resource:s3-storage
+              {% if parameters.enableFeast %}
+              - resource:feast-feature-store
+              {% endif %}
+
+    - id: publish
+      name: Publish to GitHub
+      if: ${{ parameters.createGitRepo }}
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        repoVisibility: private
+        sourcePath: ./recommender
+
+    - id: register
+      name: Register Component
+      if: ${{ parameters.createGitRepo }}
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
+      - title: OpenShift Console
+        url: ${{ parameters.openshiftCluster }}/k8s/cluster/projects/${{ parameters.namespace }}
+        icon: dashboard
+      - title: Quickstart Documentation
+        url: https://developers.redhat.com/articles/2026/01/20/ai-quickstart-product-recommender-openshift-ai
+        icon: docs
+    text:
+      - title: Next Steps
+        content: |
+          Your Product Recommender System has been configured!
+
+          Components:
+          - Text Embedding: ${{ parameters.textEmbeddingModel }}
+          - Image Embedding: ${{ parameters.imageEmbeddingModel }}
+          - LLM: ${{ parameters.llmModel }}
+          - Feature Store: ${{ parameters.enableFeast ? 'Feast enabled' : 'Disabled' }}
+          - ML Pipelines: ${{ parameters.enablePipelines ? 'Enabled' : 'Disabled' }}
+
+          Next steps:
+          1. Review the generated manifests
+          2. Ensure OpenShift AI operators are installed
+          3. Configure S3 storage access
+          4. Deploy: kubectl apply -k overlays/${{ parameters.name }}
+          5. Train initial models using the provided notebooks

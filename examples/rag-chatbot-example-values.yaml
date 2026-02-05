@@ -1,0 +1,37 @@
+# Example parameter values for Enterprise RAG Chatbot template
+# Use these as a reference when filling out the template form
+
+name: "company-knowledge-bot"
+owner: "ai-team"
+description: "Enterprise knowledge base chatbot with RAG"
+
+# Deployment
+openshiftCluster: "https://api.prod-cluster.example.com:6443"
+namespace: "rag-chatbot"
+
+# Vector Database
+vectorDB: "milvus"  # Options: milvus, pgvector, redis, qdrant
+vectorDBSize: "100Gi"
+
+# LLM Configuration
+llmProvider: "openshift-ai"  # or "external-api"
+llmModel: "Llama 3.1 70B"
+llmEndpoint: "https://llm-serving.openshift-ai.svc:8080/v1"
+llmApiKey: "internal-service-key"
+
+# Embedding Model
+embeddingModel: "BAAI/BGE-large-en-v1.5"
+chunkSize: 1000
+chunkOverlap: 200
+
+# Data Sources
+dataSources:
+  - "confluence"
+  - "sharepoint"
+  - "local-files"
+enableAutoSync: true
+syncSchedule: "0 3 * * *"  # Daily at 3 AM
+
+# Repository
+createGitRepo: true
+repoUrl: "github.com/your-org/company-knowledge-bot"

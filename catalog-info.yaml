@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: redhat-ai-quickstart-templates
+  description: Collection of Red Hat AI Quickstart templates for Developer Hub
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: url
+  targets:
+    - ./templates/generic-ai-quickstart/template.yaml
+    - ./templates/it-self-service-agent/template.yaml
+    - ./templates/product-recommender/template.yaml
+    - ./templates/enterprise-rag-chatbot/template.yaml
+    - ./templates/llm-cpu-serving/template.yaml

@@ -1,0 +1,193 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: redhat-ai-quickstart-generic
+  title: Red Hat AI Quickstart (Generic)
+  description: Deploy any Red Hat AI Quickstart with customizable parameters
+  tags:
+    - redhat
+    - ai
+    - openshift
+    - openshift-ai
+    - machine-learning
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: AI Quickstart Selection
+      required:
+        - quickstartRepo
+        - name
+        - owner
+      properties:
+        quickstartRepo:
+          title: Quickstart Repository
+          type: string
+          description: GitHub repository URL for the AI quickstart
+          default: https://github.com/rh-ai-quickstart/it-self-service-agent
+          enum:
+            - https://github.com/rh-ai-quickstart/it-self-service-agent
+            - https://github.com/rh-ai-quickstart/llm-cpu-serving
+          enumNames:
+            - IT Self-Service Agent
+            - LLM CPU Serving
+        name:
+          title: Project Name
+          type: string
+          description: Unique name for this AI quickstart instance
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+        owner:
+          title: Owner
+          type: string
+          description: Team or individual owning this component
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+        description:
+          title: Description
+          type: string
+          description: Purpose of this AI quickstart deployment
+
+    - title: OpenShift Configuration
+      required:
+        - openshiftCluster
+        - namespace
+      properties:
+        openshiftCluster:
+          title: OpenShift Cluster
+          type: string
+          description: Target OpenShift cluster URL
+          default: https://api.cluster.example.com:6443
+        namespace:
+          title: Namespace
+          type: string
+          description: OpenShift namespace/project for deployment
+          default: ai-quickstarts
+        createNamespace:
+          title: Create Namespace
+          type: boolean
+          description: Automatically create the namespace if it doesn't exist
+          default: true
+
+    - title: AI Model Configuration
+      properties:
+        modelEndpoint:
+          title: LLM Model Endpoint
+          type: string
+          description: URL for the LLM inference endpoint
+          ui:help: Leave empty to use default model serving in OpenShift AI
+        modelApiKey:
+          title: Model API Key
+          type: string
+          description: API key for model endpoint authentication
+          ui:widget: password
+          ui:help: This will be stored as a Kubernetes secret
+
+    - title: Repository Configuration
+      properties:
+        createGitRepo:
+          title: Create New Git Repository
+          type: boolean
+          description: Create a new GitHub repository for this deployment
+          default: false
+        repoUrl:
+          title: Repository Location
+          type: string
+          description: GitHub repository location (org/repo format)
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+            allowedOwners:
+              - your-org
+          ui:hidden:
+            createGitRepo: false
+
+  steps:
+    - id: fetch-quickstart
+      name: Fetch AI Quickstart
+      action: fetch:plain
+      input:
+        url: ${{ parameters.quickstartRepo }}
+        targetPath: ./quickstart
+
+    - id: template-files
+      name: Customize Configuration
+      action: fs:rename
+      input:
+        files:
+          - from: ./quickstart
+            to: ./result
+
+    - id: create-namespace-manifest
+      name: Generate Namespace Manifest
+      if: ${{ parameters.createNamespace }}
+      action: fetch:template
+      input:
+        targetPath: ./result/manifests
+        values:
+          namespace: ${{ parameters.namespace }}
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+        content:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: ${{ parameters.namespace }}
+            labels:
+              app.kubernetes.io/name: ${{ parameters.name }}
+              app.kubernetes.io/managed-by: backstage
+
+    - id: create-secrets
+      name: Generate Secrets Manifest
+      if: ${{ parameters.modelApiKey }}
+      action: fetch:template
+      input:
+        targetPath: ./result/manifests
+        values:
+          namespace: ${{ parameters.namespace }}
+          modelApiKey: ${{ parameters.modelApiKey }}
+        content:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: model-api-credentials
+            namespace: ${{ parameters.namespace }}
+          type: Opaque
+          stringData:
+            api-key: ${{ parameters.modelApiKey }}
+            endpoint: ${{ parameters.modelEndpoint }}
+
+    - id: publish
+      name: Publish to GitHub
+      if: ${{ parameters.createGitRepo }}
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        repoVisibility: private
+        sourcePath: ./result
+
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: Open in OpenShift Console
+        url: ${{ parameters.openshiftCluster }}/k8s/cluster/projects/${{ parameters.namespace }}
+        icon: dashboard
+      - title: AI Quickstart Documentation
+        url: https://docs.redhat.com/en/learn/ai-quickstarts
+        icon: docs

@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description }}
+  annotations:
+    backstage.io/kubernetes-namespace: ${{ values.namespace }}
+    openshift.io/cluster: ${{ values.openshiftCluster }}
+    docs.redhat.com/quickstart-type: ai-quickstart
+  tags:
+    - ai
+    - openshift-ai
+    - red-hat
+    - machine-learning
+  links:
+    - url: https://docs.redhat.com/en/learn/ai-quickstarts
+      title: AI Quickstarts Documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}
+  system: ai-platform

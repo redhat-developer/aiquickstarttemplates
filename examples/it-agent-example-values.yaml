@@ -1,0 +1,34 @@
+# Example parameter values for IT Self-Service Agent template
+# Use these as a reference when filling out the template form
+
+name: "it-helpdesk-agent"
+owner: "platform-team"
+description: "AI-powered helpdesk agent for laptop refresh automation"
+
+# Deployment
+deploymentMode: "testing"  # or "production"
+openshiftCluster: "https://api.prod-cluster.example.com:6443"
+namespace: "it-agent"
+
+# AI Model Configuration
+llamaEndpoint: "https://llama-api.example.com/v1/completions"
+llamaApiKey: "your-api-key-here"  # Use secret management in production!
+enableLlamaGuard: true
+enablePromptGuard: true
+
+# Integrations
+enableSlack: true
+slackToken: "xoxb-your-slack-token"
+
+enableServiceNow: true
+serviceNowUrl: "https://yourinstance.service-now.com"
+serviceNowUser: "api-user"
+serviceNowPassword: "api-password"  # Use secret management!
+
+# Observability
+enableTracing: true
+tempoEndpoint: "https://tempo.observability.svc:4317"
+
+# Repository
+createGitRepo: true
+repoUrl: "github.com/your-org/it-agent-helpdesk"

@@ -1,0 +1,30 @@
+# Secrets and credentials
+*.key
+*.pem
+.env
+.env.local
+secrets/
+credentials/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Build artifacts
+dist/
+build/
+*.log
+
+# Kubernetes secrets
+*-secret.yaml
+*-credentials.yaml
+
+# Generated manifests with secrets
+overlays/*/secrets/

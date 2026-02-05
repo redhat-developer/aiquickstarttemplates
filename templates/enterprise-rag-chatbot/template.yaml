@@ -1,0 +1,339 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: redhat-ai-enterprise-rag-chatbot
+  title: Enterprise RAG Chatbot
+  description: Deploy a Retrieval-Augmented Generation chatbot with company-specific data integration
+  tags:
+    - redhat
+    - ai
+    - openshift-ai
+    - rag
+    - chatbot
+    - vector-database
+    - llm
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Project Information
+      required:
+        - name
+        - owner
+      properties:
+        name:
+          title: Project Name
+          type: string
+          description: Name for your RAG chatbot instance
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+        owner:
+          title: Owner
+          type: string
+          description: Team or individual owning this chatbot
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+        description:
+          title: Description
+          type: string
+          description: Purpose of this RAG chatbot
+          default: Enterprise RAG chatbot with company-specific knowledge
+
+    - title: Deployment Configuration
+      required:
+        - openshiftCluster
+        - namespace
+      properties:
+        openshiftCluster:
+          title: OpenShift Cluster
+          type: string
+          description: Target OpenShift cluster URL
+          default: https://api.cluster.example.com:6443
+        namespace:
+          title: Namespace
+          type: string
+          description: OpenShift namespace for deployment
+          default: rag-chatbot
+
+    - title: Vector Database Configuration
+      required:
+        - vectorDB
+      properties:
+        vectorDB:
+          title: Vector Database
+          type: string
+          description: Choose vector database for embeddings storage
+          default: milvus
+          enum:
+            - milvus
+            - pgvector
+            - redis
+            - qdrant
+          enumNames:
+            - Milvus (Recommended)
+            - PostgreSQL with pgvector
+            - Redis Vector Search
+            - Qdrant
+        vectorDBSize:
+          title: Vector DB Storage Size
+          type: string
+          description: Persistent volume size for vector database
+          default: 50Gi
+
+    - title: LLM Configuration
+      required:
+        - llmProvider
+      properties:
+        llmProvider:
+          title: LLM Provider
+          type: string
+          description: Large Language Model provider
+          default: openshift-ai
+          enum:
+            - openshift-ai
+            - external-api
+          enumNames:
+            - OpenShift AI (Self-hosted)
+            - External API (OpenAI, Azure, etc.)
+        llmModel:
+          title: LLM Model
+          type: string
+          description: Model to use for generation
+          default: Llama 3.1 70B
+          enum:
+            - Llama 3.1 8B
+            - Llama 3.1 70B
+            - Mistral 7B
+            - Mixtral 8x7B
+        llmEndpoint:
+          title: LLM Endpoint
+          type: string
+          description: URL for LLM inference endpoint
+          ui:hidden:
+            llmProvider: openshift-ai
+        llmApiKey:
+          title: LLM API Key
+          type: string
+          description: API key for LLM authentication
+          ui:widget: password
+
+    - title: Embedding Model Configuration
+      properties:
+        embeddingModel:
+          title: Embedding Model
+          type: string
+          description: Model for generating text embeddings
+          default: BAAI/BGE-large-en-v1.5
+          enum:
+            - BAAI/BGE-large-en-v1.5
+            - BAAI/BGE-small-en-v1.5
+            - sentence-transformers/all-mpnet-base-v2
+        chunkSize:
+          title: Document Chunk Size
+          type: number
+          description: Size of text chunks for processing
+          default: 1000
+        chunkOverlap:
+          title: Chunk Overlap
+          type: number
+          description: Overlap between chunks
+          default: 200
+
+    - title: Data Source Configuration
+      properties:
+        dataSources:
+          title: Data Sources
+          type: array
+          description: Select data sources to ingest
+          items:
+            type: string
+            enum:
+              - confluence
+              - sharepoint
+              - google-drive
+              - local-files
+              - web-scraping
+              - databases
+          uniqueItems: true
+          default:
+            - local-files
+        enableAutoSync:
+          title: Enable Auto-Sync
+          type: boolean
+          description: Automatically sync data sources periodically
+          default: true
+        syncSchedule:
+          title: Sync Schedule
+          type: string
+          description: Cron schedule for data synchronization
+          default: "0 3 * * *"
+          ui:help: Daily at 3 AM (UTC)
+          ui:hidden:
+            enableAutoSync: false
+
+    - title: Repository Configuration
+      properties:
+        createGitRepo:
+          title: Create New Git Repository
+          type: boolean
+          description: Publish to a new GitHub repository
+          default: true
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+          ui:hidden:
+            createGitRepo: false
+
+  steps:
+    - id: fetch-base
+      name: Fetch RAG Chatbot Template
+      action: fetch:template
+      input:
+        url: https://github.com/rh-ai-quickstart/enterprise-rag-chatbot
+        targetPath: ./chatbot
+        values:
+          name: ${{ parameters.name }}
+          namespace: ${{ parameters.namespace }}
+          vectorDB: ${{ parameters.vectorDB }}
+          llmModel: ${{ parameters.llmModel }}
+
+    - id: create-vectordb-manifest
+      name: Generate Vector DB Manifest
+      action: fetch:template
+      input:
+        targetPath: ./chatbot/manifests
+        values:
+          namespace: ${{ parameters.namespace }}
+          vectorDB: ${{ parameters.vectorDB }}
+          storageSize: ${{ parameters.vectorDBSize }}
+        content: |
+          {% if parameters.vectorDB == 'milvus' %}
+          apiVersion: milvus.io/v1beta1
+          kind: Milvus
+          metadata:
+            name: rag-milvus
+            namespace: ${{ parameters.namespace }}
+          spec:
+            mode: standalone
+            dependencies:
+              storage:
+                type: S3
+            components:
+              image: milvusdb/milvus:latest
+            config:
+              milvus:
+                dataCoord:
+                  enableCompaction: true
+          {% elif parameters.vectorDB == 'pgvector' %}
+          apiVersion: postgres-operator.crunchydata.com/v1beta1
+          kind: PostgresCluster
+          metadata:
+            name: rag-pgvector
+            namespace: ${{ parameters.namespace }}
+          spec:
+            postgresVersion: 15
+            instances:
+              - dataVolumeClaimSpec:
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: ${{ parameters.vectorDBSize }}
+          {% endif %}
+
+    - id: create-catalog-info
+      name: Create Catalog Info
+      action: fetch:template
+      input:
+        targetPath: ./chatbot
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          namespace: ${{ parameters.namespace }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+        content: |
+          apiVersion: backstage.io/v1alpha1
+          kind: Component
+          metadata:
+            name: ${{ parameters.name }}
+            description: ${{ parameters.description }}
+            annotations:
+              backstage.io/kubernetes-namespace: ${{ parameters.namespace }}
+              openshift.io/cluster: ${{ parameters.openshiftCluster }}
+              github.com/project-slug: ${{ parameters.repoUrl | parseRepoUrl }}
+              docs.redhat.com/quickstart-type: enterprise-rag-chatbot
+            tags:
+              - ai
+              - rag
+              - chatbot
+              - vector-database
+              - ${{ parameters.vectorDB }}
+            links:
+              - url: https://docs.redhat.com/en/learn/ai-quickstarts
+                title: RAG Chatbot Documentation
+                icon: docs
+          spec:
+            type: service
+            lifecycle: experimental
+            owner: ${{ parameters.owner }}
+            system: ai-platform
+            dependsOn:
+              - resource:${{ parameters.vectorDB }}
+              - resource:openshift-ai
+
+    - id: publish
+      name: Publish to GitHub
+      if: ${{ parameters.createGitRepo }}
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        repoVisibility: private
+        sourcePath: ./chatbot
+
+    - id: register
+      name: Register Component
+      if: ${{ parameters.createGitRepo }}
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
+      - title: OpenShift Console
+        url: ${{ parameters.openshiftCluster }}/k8s/cluster/projects/${{ parameters.namespace }}
+        icon: dashboard
+    text:
+      - title: Next Steps
+        content: |
+          Your Enterprise RAG Chatbot has been configured!
+
+          Configuration:
+          - Vector DB: ${{ parameters.vectorDB }}
+          - LLM: ${{ parameters.llmModel }}
+          - Embedding Model: ${{ parameters.embeddingModel }}
+          - Data Sources: ${{ parameters.dataSources | join(', ') }}
+
+          Next steps:
+          1. Deploy vector database and wait for it to be ready
+          2. Configure data source credentials
+          3. Run initial data ingestion
+          4. Deploy chatbot application
+          5. Test with sample queries

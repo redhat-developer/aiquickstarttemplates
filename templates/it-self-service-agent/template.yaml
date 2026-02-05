@@ -1,0 +1,355 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: redhat-ai-it-self-service-agent
+  title: IT Self-Service Agent (Agentic AI)
+  description: Deploy an AI-powered self-service agent for IT process automation using Red Hat OpenShift AI
+  tags:
+    - redhat
+    - ai
+    - openshift-ai
+    - agentic-ai
+    - it-automation
+    - langgraph
+    - llama
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Project Information
+      required:
+        - name
+        - owner
+      properties:
+        name:
+          title: Project Name
+          type: string
+          description: Name for your IT Self-Service Agent instance
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+        owner:
+          title: Owner
+          type: string
+          description: Team or individual owning this agent
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+        description:
+          title: Description
+          type: string
+          description: Purpose of this IT automation agent
+          default: AI-powered self-service agent for IT process automation
+
+    - title: Deployment Configuration
+      required:
+        - deploymentMode
+        - openshiftCluster
+        - namespace
+      properties:
+        deploymentMode:
+          title: Deployment Mode
+          type: string
+          description: Choose deployment mode based on your requirements
+          default: testing
+          enum:
+            - testing
+            - production
+          enumNames:
+            - Testing (Mock Eventing - 60-90 min setup)
+            - Production (Kafka + Knative - Full event streaming)
+        openshiftCluster:
+          title: OpenShift Cluster
+          type: string
+          description: Target OpenShift cluster URL
+          default: https://api.cluster.example.com:6443
+        namespace:
+          title: Namespace
+          type: string
+          description: OpenShift namespace for deployment
+          default: it-agent
+
+    - title: AI Model Configuration
+      required:
+        - llamaEndpoint
+        - llamaApiKey
+      properties:
+        llamaEndpoint:
+          title: Llama 3 70B Endpoint
+          type: string
+          description: URL for Llama 3 70B model inference endpoint
+          ui:help: Required for agent reasoning and decision-making
+        llamaApiKey:
+          title: Llama API Key
+          type: string
+          description: API key for Llama model authentication
+          ui:widget: password
+        enableLlamaGuard:
+          title: Enable Llama Guard 3
+          type: boolean
+          description: Enable safety shields for content filtering
+          default: true
+        enablePromptGuard:
+          title: Enable PromptGuard
+          type: boolean
+          description: Enable prompt injection prevention
+          default: true
+
+    - title: Integration Configuration
+      properties:
+        enableSlack:
+          title: Enable Slack Integration
+          type: boolean
+          description: Integrate with Slack workspace
+          default: false
+        slackToken:
+          title: Slack Bot Token
+          type: string
+          description: Slack bot OAuth token
+          ui:widget: password
+          ui:hidden:
+            enableSlack: false
+        enableServiceNow:
+          title: Enable ServiceNow Integration
+          type: boolean
+          description: Integrate with ServiceNow instance
+          default: false
+        serviceNowUrl:
+          title: ServiceNow Instance URL
+          type: string
+          description: Your ServiceNow instance URL
+          ui:hidden:
+            enableServiceNow: false
+        serviceNowUser:
+          title: ServiceNow Username
+          type: string
+          ui:hidden:
+            enableServiceNow: false
+        serviceNowPassword:
+          title: ServiceNow Password
+          type: string
+          ui:widget: password
+          ui:hidden:
+            enableServiceNow: false
+
+    - title: Observability
+      properties:
+        enableTracing:
+          title: Enable OpenTelemetry Tracing
+          type: boolean
+          description: Enable distributed tracing with Tempo Stack
+          default: true
+        tempoEndpoint:
+          title: Tempo Stack Endpoint
+          type: string
+          description: Tempo endpoint for trace collection
+          ui:hidden:
+            enableTracing: false
+
+    - title: Repository Configuration
+      properties:
+        createGitRepo:
+          title: Create New Git Repository
+          type: boolean
+          description: Publish to a new GitHub repository
+          default: true
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+          ui:hidden:
+            createGitRepo: false
+
+  steps:
+    - id: fetch-base
+      name: Fetch IT Self-Service Agent
+      action: fetch:plain
+      input:
+        url: https://github.com/rh-ai-quickstart/it-self-service-agent
+        targetPath: ./agent
+
+    - id: create-kustomization
+      name: Generate Kustomization
+      action: fetch:template
+      input:
+        targetPath: ./agent/overlays/${{ parameters.name }}
+        values:
+          name: ${{ parameters.name }}
+          namespace: ${{ parameters.namespace }}
+          deploymentMode: ${{ parameters.deploymentMode }}
+        content: |
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          namespace: ${{ parameters.namespace }}
+
+          resources:
+            - ../../base
+
+          configMapGenerator:
+            - name: agent-config
+              literals:
+                - DEPLOYMENT_MODE=${{ parameters.deploymentMode }}
+                - ENABLE_LLAMA_GUARD=${{ parameters.enableLlamaGuard }}
+                - ENABLE_PROMPT_GUARD=${{ parameters.enablePromptGuard }}
+                - ENABLE_TRACING=${{ parameters.enableTracing }}
+
+    - id: create-secrets
+      name: Generate Secrets
+      action: fetch:template
+      input:
+        targetPath: ./agent/overlays/${{ parameters.name }}
+        values:
+          namespace: ${{ parameters.namespace }}
+          llamaApiKey: ${{ parameters.llamaApiKey }}
+          llamaEndpoint: ${{ parameters.llamaEndpoint }}
+          slackToken: ${{ parameters.slackToken }}
+          serviceNowUrl: ${{ parameters.serviceNowUrl }}
+          serviceNowUser: ${{ parameters.serviceNowUser }}
+          serviceNowPassword: ${{ parameters.serviceNowPassword }}
+        content: |
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: agent-credentials
+            namespace: ${{ parameters.namespace }}
+          type: Opaque
+          stringData:
+            llama-endpoint: ${{ parameters.llamaEndpoint }}
+            llama-api-key: ${{ parameters.llamaApiKey }}
+            {% if parameters.enableSlack %}
+            slack-token: ${{ parameters.slackToken }}
+            {% endif %}
+            {% if parameters.enableServiceNow %}
+            servicenow-url: ${{ parameters.serviceNowUrl }}
+            servicenow-user: ${{ parameters.serviceNowUser }}
+            servicenow-password: ${{ parameters.serviceNowPassword }}
+            {% endif %}
+
+    - id: create-catalog-info
+      name: Create Catalog Info
+      action: fetch:template
+      input:
+        targetPath: ./agent
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          namespace: ${{ parameters.namespace }}
+          openshiftCluster: ${{ parameters.openshiftCluster }}
+        content: |
+          apiVersion: backstage.io/v1alpha1
+          kind: Component
+          metadata:
+            name: ${{ parameters.name }}
+            description: ${{ parameters.description }}
+            annotations:
+              backstage.io/kubernetes-namespace: ${{ parameters.namespace }}
+              openshift.io/cluster: ${{ parameters.openshiftCluster }}
+              github.com/project-slug: ${{ parameters.repoUrl | parseRepoUrl }}
+              docs.redhat.com/quickstart-type: it-self-service-agent
+            tags:
+              - ai
+              - openshift-ai
+              - agentic-ai
+              - it-automation
+              - langgraph
+              - llama
+            links:
+              - url: https://developers.redhat.com/articles/2026/01/26/ai-quickstart-self-service-agent-it-process-automation
+                title: Quickstart Documentation
+                icon: docs
+              - url: https://github.com/rh-ai-quickstart/it-self-service-agent
+                title: Source Repository
+                icon: github
+          spec:
+            type: service
+            lifecycle: experimental
+            owner: ${{ parameters.owner }}
+            system: ai-platform
+            dependsOn:
+              - resource:openshift-ai
+              - resource:llama-3-70b
+
+    - id: publish
+      name: Publish to GitHub
+      if: ${{ parameters.createGitRepo }}
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        repoVisibility: private
+        sourcePath: ./agent
+
+    - id: register
+      name: Register Component
+      if: ${{ parameters.createGitRepo }}
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+    - id: create-argocd-app
+      name: Create ArgoCD Application
+      if: ${{ parameters.deploymentMode == 'production' }}
+      action: fetch:template
+      input:
+        targetPath: ./argocd
+        values:
+          name: ${{ parameters.name }}
+          namespace: ${{ parameters.namespace }}
+          repoUrl: ${{ steps.publish.output.remoteUrl }}
+        content: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: ${{ parameters.name }}
+            namespace: openshift-gitops
+          spec:
+            project: default
+            source:
+              repoURL: ${{ steps.publish.output.remoteUrl }}
+              targetRevision: main
+              path: overlays/${{ parameters.name }}
+            destination:
+              server: ${{ parameters.openshiftCluster }}
+              namespace: ${{ parameters.namespace }}
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
+      - title: OpenShift Console
+        url: ${{ parameters.openshiftCluster }}/k8s/cluster/projects/${{ parameters.namespace }}
+        icon: dashboard
+      - title: Quickstart Documentation
+        url: https://developers.redhat.com/articles/2026/01/26/ai-quickstart-self-service-agent-it-process-automation
+        icon: docs
+    text:
+      - title: Next Steps
+        content: |
+          Your IT Self-Service Agent has been configured!
+
+          Deployment Mode: ${{ parameters.deploymentMode }}
+          Namespace: ${{ parameters.namespace }}
+
+          Next steps:
+          1. Review the generated manifests in your repository
+          2. Configure OpenShift AI and required operators
+          3. Deploy using: kubectl apply -k overlays/${{ parameters.name }}
+          4. Access the agent via CLI, Slack, or ServiceNow
+
+          Estimated deployment time: ${{ parameters.deploymentMode == 'testing' ? '60-90 minutes' : '2-3 hours' }}

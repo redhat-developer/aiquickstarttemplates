@@ -1,0 +1,38 @@
+# Example parameter values for LLM CPU Serving template
+# Use these as a reference when filling out the template form
+
+name: "dev-llm-service"
+owner: "developer-tools"
+description: "Lightweight LLM for development team"
+
+# Deployment
+openshiftCluster: "https://api.dev-cluster.example.com:6443"
+namespace: "llm-serving"
+
+# Model Configuration
+modelSize: "small-1b"  # Options: small-1b, medium-3b, large-7b
+modelSource: "huggingface"
+huggingfaceModel: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+quantization: "int8"  # Options: none, int8, int4
+
+# Serving Configuration
+maxConcurrentRequests: 4
+maxTokens: 512
+temperature: 0.7
+enableCaching: true
+
+# Resource Limits
+cpuRequest: "2"
+cpuLimit: "4"
+memoryRequest: "4Gi"
+memoryLimit: "8Gi"
+
+# API Configuration
+enableAuth: true
+apiKeys: "key1,key2,key3"  # Comma-separated
+enableRateLimit: true
+rateLimit: "60"  # Requests per minute
+
+# Repository
+createGitRepo: true
+repoUrl: "github.com/your-org/dev-llm-service"
