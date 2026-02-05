@@ -609,8 +609,8 @@ All templates are verified against real rh-ai-quickstart repositories to ensure 
 - ✅ NEW: AI Observability Summarizer - AI-powered monitoring
 - ✅ Generic template for flexibility
 - All templates match actual quickstart implementations
-- Updated documentation with real features and prerequisites
-- Example values for all 5 real quickstarts
+- Updated documentation with features and prerequisites
+- Example values for all 5 quickstarts
 
 ### Version 1.0.0 (2026-02-04)
 - Initial release 
